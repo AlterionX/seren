@@ -8,6 +8,7 @@ pub enum Error {
     Initialization(InitErr),
     Load(LoadErr),
     Input(input::Err),
+    Display(display::Err),
     Resolution(Resolution),
 }
 impl From<InitErr> for Error {
@@ -23,6 +24,11 @@ impl From<LoadErr> for Error {
 impl From<input::Err> for Error {
     fn from(e: input::Err) -> Self {
         Error::Input(e)
+    }
+}
+impl From<display::Err> for Error {
+    fn from(e: display::Err) -> Self {
+        Error::Display(e)
     }
 }
 impl From<Resolution> for Error {
@@ -46,6 +52,14 @@ impl From<io::Error> for InitErr {
         InitErr::IOErr(e)
     }
 }
+impl From<LoadErr> for InitErr {
+    fn from(e: LoadErr) -> Self {
+        match e {
+            LoadErr::IOErr(e) => InitErr::IOErr(e),
+            LoadErr::ParseErr(e) => InitErr::ParseErr(e),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum LoadErr {
@@ -62,6 +76,14 @@ impl From<io::Error> for LoadErr {
         LoadErr::IOErr(e)
     }
 }
+impl From<InitErr> for LoadErr {
+    fn from(e: InitErr) -> Self {
+        match e {
+            InitErr::IOErr(e) => LoadErr::IOErr(e),
+            InitErr::ParseErr(e) => LoadErr::ParseErr(e),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Resolution(String);
@@ -75,5 +97,5 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub trait State {
     type ActionEnum: std::fmt::Debug;
-    fn resolve(&mut self, a: Self::ActionEnum) -> Result<()>;
+    fn resolve(&mut self, a: Self::ActionEnum) -> Result<display::RenderMode>;
 }

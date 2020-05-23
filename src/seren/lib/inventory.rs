@@ -1,4 +1,4 @@
-use crate::seren::item::{Item, SaveItemStack, ItemStack};
+use crate::seren::lib::item::{Item, SaveItemStack, ItemStack};
 
 pub type Inventory = Vec<ItemStack>;
 

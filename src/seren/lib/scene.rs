@@ -1,11 +1,8 @@
 use serde::{Serialize, Deserialize};
+use crate::seren::lib::stats;
 
 #[derive(Serialize, Deserialize)]
-pub enum Stat {
-    Bossiness,
-}
-#[derive(Serialize, Deserialize)]
-pub struct StatChange {
+pub struct StatChange<Stat> {
     stat: Stat,
     change: i64,
 }
@@ -17,7 +14,7 @@ pub enum Permission {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct StatRequirement {
+pub struct StatRequirement<Stat> {
     stat: Stat,
     permission: Permission,
     range: (std::ops::Bound<i64>, std::ops::Bound<i64>),
@@ -31,14 +28,14 @@ pub struct SceneChange {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Choice {
+pub struct Choice<Stat> {
     display: String,
-    stat_changes: Option<Vec<StatChange>>,
+    stat_changes: Option<Vec<StatChange<Stat>>>,
     scene_change: Option<SceneChange>,
-    guards: Vec<StatRequirement>,
+    guards: Vec<StatRequirement<Stat>>,
 }
 
-impl std::fmt::Display for Choice {
+impl<Stat> std::fmt::Display for Choice<Stat> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         // TODO possibly render the rest?
         write!(f, "{}", self.display)
@@ -46,12 +43,12 @@ impl std::fmt::Display for Choice {
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum StandardLineEnum {
-    Choice(String, Vec<Choice>),
+pub enum StandardLineEnum<Stat> {
+    Choice(String, Vec<Choice<Stat>>),
     Plain(String),
 }
 
-impl std::fmt::Display for StandardLineEnum {
+impl<Stat> std::fmt::Display for StandardLineEnum<Stat> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             StandardLineEnum::Choice(text, choices) => {
@@ -79,4 +76,4 @@ impl<LE> Scene<LE> {
     }
 }
 
-pub type StandardScene = Scene<StandardLineEnum>;
+pub type StandardScene = Scene<StandardLineEnum<stats::Stat>>;
