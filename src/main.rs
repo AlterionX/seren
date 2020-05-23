@@ -5,21 +5,23 @@ mod seren;
 
 use structopt::StructOpt;
 
-pub fn run_app<State: game::State, Cfg>(
+pub fn run_app<State: game::State>(
     mut state: State,
     // Normalized input device
     mut input: impl game::input::Input<State::ActionEnum>,
     // Normalized output device
-    mut display: impl game::display::Display<State, Cfg>,
+    mut display: impl game::display::Display<State, State::Cfg>,
     // Cfg
-    cfg: Cfg
+    cfg: State::Cfg
 ) -> game::Result<()> {
+    // Render once to get the ball rolling.
+    display.display(&state, &cfg)?;
     loop {
         let action = input.next_action()?;
         println!("Executing action {:?}", action);
         match action {
             game::input::SystemAction::Exit => break,
-            game::input::SystemAction::Action(a) => match state.resolve(a)? {
+            game::input::SystemAction::Action(a) => match state.resolve(&cfg, a)? {
                 game::display::RenderMode::Render => display.display(&state, &cfg)?,
                 game::display::RenderMode::Ignore => (),
             },
@@ -29,6 +31,7 @@ pub fn run_app<State: game::State, Cfg>(
 }
 
 fn main() -> game::Result<()> {
+
     let opts = seren::CommandLineInterface::from_args();
     println!("Cmdline options: {:?}", opts);
 

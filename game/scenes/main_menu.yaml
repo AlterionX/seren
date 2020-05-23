@@ -1,0 +1,22 @@
+lines:
+  - Choice:
+      text: this is the text
+      choices:
+        - display: choice 0
+        - display: choice 1
+          stat_changes:
+            - stat: Bossiness
+              change: 0
+        - display: choice 2
+          scene_change:
+            display: Why is this here?
+            target_scene: a
+        - display: choice 3
+          guards:
+            - stat: Bossiness
+              permission: Allow
+              range:
+                - Included: 0
+                - Excluded: 10
+  - Plain: "Hello, the game ends past this point."
+next_scene: a

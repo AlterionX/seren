@@ -97,5 +97,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub trait State {
     type ActionEnum: std::fmt::Debug;
-    fn resolve(&mut self, a: Self::ActionEnum) -> Result<display::RenderMode>;
+    type Cfg: std::fmt::Debug;
+    fn resolve(&mut self, cfg: &Self::Cfg, a: Self::ActionEnum) -> std::result::Result<display::RenderMode, Resolution>;
 }

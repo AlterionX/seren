@@ -1,3 +1,5 @@
+// This entire file is TODO.
+
 use serde::{Serialize, Deserialize};
 use crate::{seren::lib::cfg, game::{self, input::SystemAction}};
 
@@ -51,7 +53,9 @@ impl Action {
 
 impl<'a> game::State for State {
     type ActionEnum = Action;
-    fn resolve(&mut self, a: Action) -> game::Result<game::display::RenderMode> {
+    type Cfg = Cfg;
+    fn resolve(&mut self, _cfg: &Cfg, _a: Action) -> Result<game::display::RenderMode, game::Resolution> {
+        // TODO
         Ok(game::display::RenderMode::Render)
     }
 }
