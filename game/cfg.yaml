@@ -1,0 +1,4 @@
+scene_list:
+  - a
+  - b
+scenes: "./scenes/"
