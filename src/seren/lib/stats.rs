@@ -5,22 +5,57 @@ pub enum Stat {
     Bossiness,
 }
 
+impl Stat {
+    pub fn default_val(&self) -> i64 {
+        // TODO Consider making this a match statement instead.
+        match self {
+            Self::Bossiness => 0,
+        }
+    }
+}
+
+pub trait StatStore<S> {
+    fn stat_value(&self, s: S) -> i64;
+    fn verify(&self, req: &super::scene::StatRequirement<S>) -> bool;
+    fn apply(&mut self, change: &super::scene::StatChange<S>);
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Stats {
     bossiness: i64,
 }
 
-impl Stats {
-    pub fn verify(&self, req: &super::scene::StatRequirement<Stat>) -> bool {
-        // TODO verify
+impl Default for Stats {
+    fn default() -> Self {
+        Self {
+            bossiness: Stat::Bossiness.default_val()
+        }
+    }
+}
+
+impl StatStore<Stat> for Stats {
+    fn stat_value(&self, s: Stat) -> i64 {
+        match s {
+            Stat::Bossiness => {
+                self.bossiness
+            },
+        }
+    }
+    fn verify(&self, req: &super::scene::StatRequirement<Stat>) -> bool {
         let super::scene::StatRequirement {
             stat,
             range,
             ..
         } = req;
-        false
+        match stat {
+            Stat::Bossiness => {
+                let val = self.bossiness;
+                use std::ops::RangeBounds;
+                range.contains(&val)
+            },
+        }
     }
-    pub fn apply(&mut self, req: &super::scene::StatChange<Stat>) {
+    fn apply(&mut self, req: &super::scene::StatChange<Stat>) {
         let super::scene::StatChange {
             stat,
             change,

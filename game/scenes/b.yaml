@@ -1,2 +1,5 @@
-And thus the friendship comes to an end.
-Goodbye. It was nice knowing you.
+lines:
+  - Plain:
+      text: "Waow, unexpected snob. I hate you."
+  - Plain:
+      text: "Goodbye."

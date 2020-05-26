@@ -1,22 +1,24 @@
 lines:
   - Choice:
-      text: this is the text
+      text: "Welcome to the game.
+             Press Ctrl+D to exit the command line version.
+             Please tell me what to do."
       choices:
-        - display: choice 0
-        - display: choice 1
+        - text: Start the game.
+        - text: Start the game, peon.
           stat_changes:
             - stat: Bossiness
-              change: 0
-        - display: choice 2
+              change: 2
+        - text: Start the game already.
           scene_change:
-            display: Why is this here?
             target_scene: a
-        - display: choice 3
+        - text: This should be hidden.
           guards:
             - stat: Bossiness
               permission: Allow
               range:
-                - Included: 0
+                - Included: 1
                 - Excluded: 10
-  - Plain: "Hello, the game ends past this point."
+  - Plain:
+      text: "Well then, this sounds like the start to a wonderful friendship."
 next_scene: a

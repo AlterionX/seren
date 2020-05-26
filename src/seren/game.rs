@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use std::{io::BufReader, fs::File};
-use crate::{game::{self, input::SystemAction}, seren::lib::{cfg, scene, stats}};
+use crate::{game::{self, input::SystemAction}, seren::lib::{cfg, scene, stats::{self, StatStore}}};
 
 pub use cfg::Cfg;
 
@@ -38,7 +38,7 @@ impl Action {
 pub struct State {
     curr_scene_name: String,
     curr_scene: scene::StandardScene,
-    curr_line: u64, // TODO make this usize
+    curr_line: usize,
     stats: Option<stats::Stats>,
     error_text: Option<String>,
 }
@@ -50,19 +50,30 @@ impl<'a> game::State for State {
         let mut needs_scene_load = false;
         match a {
             Action::Progress => {
-                let line = self.curr_scene.get_line(self.curr_line as usize);
+                let line = self.curr_scene.get_line(self.curr_line);
                 match line {
-                    Some(scene::StandardLineEnum::Plain(_)) => {
-                        if self.curr_scene.line_count() == 0 || self.curr_line < (self.curr_scene.line_count() as u64) - 1 {
+                    Some(scene::StandardLineEnum::Plain { .. }) => {
+                        if self.curr_scene.line_count() == 0 || self.curr_line < self.curr_scene.line_count() - 1 {
+                            log::debug!("Progressing to next line.");
                             self.curr_line += 1;
+                            log::trace!("Current line set to {}.", self.curr_line);
                         } else {
-                            // TODO progress to next scene
+                            log::debug!("Reached end of scene.");
                             needs_scene_load = true;
-                            self.curr_scene_name = self.curr_scene.next_scene.clone();
+                            if let Some(scene) = self.curr_scene.next_scene.as_ref() {
+                                log::debug!("Progressing to next scene.");
+                                self.curr_scene_name = scene.clone();
+                                self.curr_line = 0;
+                                log::trace!("Progressing to scene {}, line {}.", self.curr_scene_name, self.curr_line);
+                            } else {
+                                // TODO the game is over, what now?
+                                log::debug!("Terminal scene completed. Restarting game.");
+                                self.reset_no_load(cfg);
+                            }
                         }
                     },
                     Some(scene::StandardLineEnum::Choice { .. }) => {
-                        log::error!("Attempted to skip option.");
+                        log::warn!("Attempted to skip option.");
                         return Ok(game::display::RenderMode::Ignore);
                     },
                     None => {
@@ -71,28 +82,23 @@ impl<'a> game::State for State {
                 }
             },
             Action::Select(choice) => {
-                let line = self.curr_scene.get_line(self.curr_line as usize);
+                let line = self.curr_scene.get_line(self.curr_line);
                 match line {
-                    Some(scene::StandardLineEnum::Plain(_)) => {
-                        log::error!("Attempted to pick option when no options exist.");
+                    Some(scene::StandardLineEnum::Plain { .. }) => {
+                        log::warn!("Attempted to pick option when no options exist.");
                         return Ok(game::display::RenderMode::Ignore);
                     },
-                    Some(scene::StandardLineEnum::Choice { choices, .. }) => {
+                    Some(line @ scene::StandardLineEnum::Choice { .. }) => {
+                        let choices = scene::FilteredStandardLine {
+                            line,
+                            stats: self.stats.as_ref()
+                        }.get_filtered_choices();
                         let scene::Choice {
                             stat_changes,
                             scene_change,
-                            guards,
                             ..
                         } = choices.get(choice)
                             .ok_or_else(|| "Attmpted to pick nonexistent option.".to_string())?;
-                        if let Some(guards) = guards {
-                            for guard in guards {
-                                let is_valid_choice = self.stats.as_ref().map(|s| s.verify(guard)).unwrap_or(false);
-                                if !is_valid_choice {
-                                    return Err(format!("Attmpted to pick unavailable option.").into());
-                                }
-                            }
-                        }
                         self.curr_line += 1;
                         if let (Some(stats), Some(changes)) = (self.stats.as_mut(), stat_changes.as_ref()) {
                             for change in changes {
@@ -101,7 +107,6 @@ impl<'a> game::State for State {
                         }
                         if let Some(change) = scene_change {
                             let scene::SceneChange {
-                                display, // TODO figure out why this was put here, but it can prob be removed.
                                 target_scene,
                                 target_line,
                             } = change;
@@ -112,7 +117,7 @@ impl<'a> game::State for State {
                                 needs_scene_load = true;
                             }
                             if let Some(line) = target_line {
-                                self.curr_line = line.clone() as u64;
+                                self.curr_line = line.clone();
                             }
                         }
                     },
@@ -123,6 +128,7 @@ impl<'a> game::State for State {
             },
         };
         if needs_scene_load {
+            log::debug!("New scene required. Loading...");
             let scene = Self::load_scene(cfg, self.curr_scene_name.as_str())
                 .map_err(|_| "Failed to load scene.".to_string())?;
             self.curr_scene = scene;
@@ -143,9 +149,17 @@ impl State {
         })
     }
 
+    fn reset_no_load(&mut self, cfg: &cfg::Cfg) {
+        self.stats = None;
+        self.curr_scene_name = cfg.primary_scene.clone(); 
+        self.curr_line = 0;
+        self.error_text = None;
+    }
+
     fn load_scene(cfg: &Cfg, name: &str) -> Result<scene::StandardScene, game::LoadErr> {
+        log::error!("Loading scene {:?}.", name);
         let p = cfg.root.join(cfg.scenes.as_path()).join(format!("{}.yaml", name));
-        log::debug!("Loading scene: {:?}", p);
+        log::debug!("Loading scene from file {}.", p.display());
         let f = File::open(p)?;
         let buf = BufReader::new(f);
         Ok(serde_yaml::from_reader(buf)?)
@@ -154,8 +168,8 @@ impl State {
 
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if let Some(line) = self.curr_scene.get_line(self.curr_line as usize) {
-            write!(f, "{}", line)
+        if let Some(line) = self.curr_scene.get_line(self.curr_line) {
+            write!(f, "{}", scene::FilteredStandardLine { line, stats: self.stats.as_ref() })
         } else {
             write!(f, "Oops, an error has occurred.")
         }
