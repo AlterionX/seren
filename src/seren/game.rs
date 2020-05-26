@@ -122,6 +122,7 @@ impl<'a> game::State for State {
                         }
                     },
                     None => {
+                        // TODO handle the oob problem.
                         Err("OOB current line, what to do?".to_string())?;
                     },
                 }
