@@ -1,11 +1,48 @@
 //! TODO Audio device
+use structopt::StructOpt;
+use tap::*;
 
 mod game;
 mod seren;
 
-use structopt::StructOpt;
+#[cfg(debug_assertions)]
+fn setup_logger() -> Result<(), fern::InitError> {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Debug)
+        .chain(std::io::stdout())
+        .chain(fern::log_file("output.log")?)
+        .apply()?;
+    Ok(())
+}
 
-pub fn run_app<State: game::State>(
+#[cfg(not(debug_assertions))]
+fn setup_logger() -> Result<(), fern::InitError> {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Debug)
+        .chain(fern::log_file("output.log")?)
+        .apply()?;
+    Ok(())
+}
+
+fn run_app<State: game::State>(
     mut state: State,
     // Normalized input device
     mut input: impl game::input::Input<State::ActionEnum>,
@@ -18,9 +55,12 @@ pub fn run_app<State: game::State>(
     display.display(&state, &cfg)?;
     loop {
         let action = input.next_action()?;
-        println!("Executing action {:?}", action);
+        log::debug!("Executing action {:?}", action);
         match action {
-            game::input::SystemAction::Exit => break,
+            game::input::SystemAction::Exit => {
+                log::info!("System exit command received. Shutting down.");
+                break;
+            },
             game::input::SystemAction::Action(a) => match state.resolve(&cfg, a)? {
                 game::display::RenderMode::Render => display.display(&state, &cfg)?,
                 game::display::RenderMode::Ignore => (),
@@ -31,22 +71,35 @@ pub fn run_app<State: game::State>(
 }
 
 fn main() -> game::Result<()> {
+    setup_logger()
+        .tap_err(|e| println!("Fern logger failed to initialize due to {:?}.", e))
+        .map_err(|_| game::Resolution("Fern logger failed to initialize.".to_string()))?;
 
+    log::info!("SeRen loading cmdline options.");
     let opts = seren::CommandLineInterface::from_args();
-    println!("Cmdline options: {:?}", opts);
+    log::debug!("SeRen started with cmdline options {:?}.", opts);
 
-    let cfg = seren::GameCfg::load_from(opts.game_cfg_path.as_path())?;
-    println!("Game cfg loaded: {:?}", cfg);
+    log::info!("SeRen loading game cfg from {}.", opts.game_cfg_path.display());
+    let cfg = seren::GameCfg::load_from(opts.game_cfg_path.as_path())
+        .tap_err(|e| log::error!("Cfg failed to load due to {:?}. Shutting down.", e))?;
+    log::debug!("SeRen loaded game cfg {:?}.", cfg);
 
-    if opts.use_editor {
+    let res = if opts.use_editor {
+        log::info!("Launching SeRen in editor mode.");
         let input = game::input::cmd_line(seren::editor::Action::parse_input);
         let display = game::display::cmd_line();
-        run_app(seren::EditorState::new(cfg), input, display, seren::EditorCfg)?;
+        log::trace!("Input and display intialized. Running editor now.");
+        run_app(seren::EditorState::new(cfg), input, display, seren::EditorCfg)
+            .tap_err(|e| log::error!("Editor has crashed due to {:?}.", e))
     } else {
+        log::info!("Launching SeRen in game mode.");
         let input = game::input::cmd_line(seren::game::Action::parse_input);
         let display = game::display::cmd_line();
-        run_app(seren::GameState::init(&cfg)?, input, display, cfg)?;
-    }
+        log::trace!("Input and display intialized. Running game now.");
+        run_app(seren::GameState::init(&cfg)?, input, display, cfg)
+            .tap_err(|e| log::error!("Game has crashed due to {:?}.", e))
+    };
 
-    Ok(())
+    log::trace!("Shutdown complete. Terminating.");
+    res
 }

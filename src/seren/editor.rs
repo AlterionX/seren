@@ -39,6 +39,7 @@ impl Action {
                     if let Some(n) = cmd.parse::<usize>().ok() {
                         Action::Select(n)
                     } else {
+                        // TODO eventually consider some sort of input.
                         Action::Progress
                     }
                 }

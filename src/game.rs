@@ -86,7 +86,7 @@ impl From<InitErr> for LoadErr {
 }
 
 #[derive(Debug)]
-pub struct Resolution(String);
+pub struct Resolution(pub String);
 impl From<String> for Resolution {
     fn from(e: String) -> Self {
         Resolution(e)
