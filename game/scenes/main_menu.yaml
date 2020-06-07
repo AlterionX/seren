@@ -9,6 +9,8 @@ lines:
           stat_changes:
             - stat: Bossiness
               change: 2
+          scene_change:
+            target_scene: b
         - text: Start the game already.
           scene_change:
             target_scene: a

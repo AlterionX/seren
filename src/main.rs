@@ -5,42 +5,7 @@ use tap::*;
 mod game;
 mod seren;
 
-#[cfg(debug_assertions)]
-fn setup_logger() -> Result<(), fern::InitError> {
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                record.target(),
-                record.level(),
-                message
-            ))
-        })
-        .level(log::LevelFilter::Debug)
-        .chain(std::io::stdout())
-        .chain(fern::log_file("output.log")?)
-        .apply()?;
-    Ok(())
-}
-
-#[cfg(not(debug_assertions))]
-fn setup_logger() -> Result<(), fern::InitError> {
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                record.target(),
-                record.level(),
-                message
-            ))
-        })
-        .level(log::LevelFilter::Debug)
-        .chain(fern::log_file("output.log")?)
-        .apply()?;
-    Ok(())
-}
+mod logger;
 
 fn run_app<State: game::State>(
     mut state: State,
@@ -71,7 +36,7 @@ fn run_app<State: game::State>(
 }
 
 fn main() -> game::Result<()> {
-    setup_logger()
+    logger::setup()
         .tap_err(|e| println!("Fern logger failed to initialize due to {:?}.", e))
         .map_err(|_| game::Resolution("Fern logger failed to initialize.".to_string()))?;
 
