@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 pub enum Stat {
     Bossiness,
 }
@@ -21,6 +22,7 @@ pub trait StatStore<S> {
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Stats {
     bossiness: i64,
 }

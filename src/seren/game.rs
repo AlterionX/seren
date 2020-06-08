@@ -1,5 +1,6 @@
 use serde::{Serialize, Deserialize};
 use std::{io::BufReader, fs::File};
+use tap::*;
 use crate::{game::{self, input::SystemAction}, seren::lib::{cfg, scene, stats::{self, StatStore}}};
 
 pub use cfg::Cfg;
@@ -8,6 +9,7 @@ pub use cfg::Cfg;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Action {
     Progress,
+    PromptRetry,
     Select(usize)
 }
 
@@ -21,7 +23,11 @@ impl Action {
                 }
                 _ => {
                     if let Some(n) = cmd.parse::<usize>().ok() {
-                        Action::Select(n)
+                        if n == 0 {
+                            Action::PromptRetry
+                        } else {
+                            Action::Select(n - 1)
+                        }
                     } else {
                         Action::Progress
                     }
@@ -48,7 +54,11 @@ impl<'a> game::State for State {
     type Cfg = Cfg;
     fn resolve(&mut self, cfg: &Cfg, a: Action) -> Result<game::display::RenderMode, game::Resolution> {
         let mut needs_scene_load = false;
+        let _ = self.error_text.take();
         match a {
+            Action::PromptRetry => {
+                let _ = self.error_text.replace("Invalid input. Please retry.".to_string());
+            },
             Action::Progress => {
                 let line = self.curr_scene.get_line(self.curr_line);
                 match line {
@@ -77,7 +87,7 @@ impl<'a> game::State for State {
                         return Ok(game::display::RenderMode::Ignore);
                     },
                     None => {
-                        Err("OOB current line, what to do?".to_string())?;
+                        return Err("OOB current line, what to do?".to_string().into());
                     },
                 }
             },
@@ -89,6 +99,7 @@ impl<'a> game::State for State {
                         return Ok(game::display::RenderMode::Ignore);
                     },
                     Some(line @ scene::StandardLineEnum::Choice { .. }) => {
+                        log::info!("User selected option {}.", choice);
                         let choices = scene::FilteredStandardLine {
                             line,
                             stats: self.stats.as_ref()
@@ -98,6 +109,7 @@ impl<'a> game::State for State {
                             scene_change,
                             ..
                         } = choices.get(choice)
+                            .tap(|c| log::trace!("User selected option {:?}.", c))
                             .ok_or_else(|| "Attmpted to pick nonexistent option.".to_string())?;
                         self.curr_line += 1;
                         if let (Some(stats), Some(changes)) = (self.stats.as_mut(), stat_changes.as_ref()) {
@@ -111,13 +123,14 @@ impl<'a> game::State for State {
                                 target_line,
                             } = change;
                             if let Some(scene_name) = target_scene {
-                                let scene_name = scene_name.clone();
                                 self.curr_scene_name = scene_name.clone();
+                                log::info!("Setting target scene to {:?}, at line 0 while processing choice selection.", self.curr_scene_name);
                                 self.curr_line = 0;
                                 needs_scene_load = true;
                             }
                             if let Some(line) = target_line {
-                                self.curr_line = line.clone();
+                                log::info!("Line number changed from {} to {} while processing choice selection.", self.curr_line, line);
+                                self.curr_line = *line;
                             }
                         }
                     },
@@ -158,7 +171,7 @@ impl State {
     }
 
     fn load_scene(cfg: &Cfg, name: &str) -> Result<scene::StandardScene, game::LoadErr> {
-        log::error!("Loading scene {:?}.", name);
+        log::debug!("Loading scene {:?}.", name);
         let p = cfg.root.join(cfg.scenes.as_path()).join(format!("{}.yaml", name));
         log::debug!("Loading scene from file {}.", p.display());
         let f = File::open(p)?;
@@ -169,7 +182,10 @@ impl State {
 
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if let Some(line) = self.curr_scene.get_line(self.curr_line) {
+        // TODO determine if the current line should be reprinted after an error occurs.
+        if let Some(text) = self.error_text.as_ref() { 
+            write!(f, "{}", text)
+        } else if let Some(line) = self.curr_scene.get_line(self.curr_line) {
             write!(f, "{}", scene::FilteredStandardLine { line, stats: self.stats.as_ref() })
         } else {
             write!(f, "Oops, an error has occurred.")

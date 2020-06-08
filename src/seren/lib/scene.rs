@@ -1,19 +1,23 @@
 use serde::{Serialize, Deserialize};
+use tap::*;
 use crate::seren::lib::stats;
 
 #[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct StatChange<Stat> {
     pub stat: Stat,
     pub change: i64,
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 pub enum Permission {
     Allow,
     Disallow,
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct StatRequirement<Stat> {
     pub stat: Stat,
     pub permission: Permission,
@@ -21,12 +25,14 @@ pub struct StatRequirement<Stat> {
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct SceneChange {
     pub target_scene: Option<String>,
     pub target_line: Option<usize>,
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Choice<Stat> {
     pub text: String,
     pub stat_changes: Option<Vec<StatChange<Stat>>>,
@@ -42,6 +48,7 @@ impl<Stat> std::fmt::Display for Choice<Stat> {
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 pub enum StandardLineEnum<Stat> {
     Choice {
         text: String,
@@ -148,6 +155,7 @@ impl<'a, 'b, Stat, StatStore: stats::StatStore<Stat> + Default> std::fmt::Displa
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Scene<LineEnum> {
     lines: Vec<LineEnum>,
     pub next_scene: Option<String>,
