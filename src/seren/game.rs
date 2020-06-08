@@ -16,7 +16,7 @@ pub enum Action {
 impl Action {
     pub fn parse_input(cmd: Option<String>) -> Result<SystemAction<Action>, String> {
         let action = if let Some(cmd) = cmd {
-            println!("Entry echo: {:?}", cmd);
+            log::debug!("Entry echo: {:?}", cmd);
             let action = match cmd.as_str() {
                 "" => {
                     Action::Progress
@@ -108,9 +108,13 @@ impl<'a> game::State for State {
                             stat_changes,
                             scene_change,
                             ..
-                        } = choices.get(choice)
-                            .tap(|c| log::trace!("User selected option {:?}.", c))
-                            .ok_or_else(|| "Attmpted to pick nonexistent option.".to_string())?;
+                        } = if let Some(c) = choices.get(choice) {
+                            log::trace!("User selected option {:?}.", c);
+                            c
+                        } else {
+                            self.error_text.replace("Attmpted to pick nonexistent option.".to_string());
+                            return Ok(game::display::RenderMode::Render);
+                        };
                         self.curr_line += 1;
                         if let (Some(stats), Some(changes)) = (self.stats.as_mut(), stat_changes.as_ref()) {
                             for change in changes {

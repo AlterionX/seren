@@ -18,9 +18,9 @@ impl Cfg {
             .level(self.level)
             .chain(fern::log_file("output.log")?);
         let dispatch = if self.bypass_stdio {
-            dispatch.chain(std::io::stdout())
-        } else {
             dispatch
+        } else {
+            dispatch.chain(std::io::stdout())
         };
         dispatch.apply().map_err(Into::into)
     }

@@ -30,7 +30,7 @@ pub enum Action {
 impl Action {
     pub fn parse_input(cmd: Option<String>) -> Result<SystemAction<Action>, String> {
         let action = if let Some(cmd) = cmd {
-            println!("Entry echo: {:?}", cmd);
+            log::debug!("Entry echo: {:?}", cmd);
             let action = match cmd.as_str() {
                 "" => {
                     Action::Progress
