@@ -52,17 +52,31 @@ fn main() -> game::Result<()> {
     let res = if opts.use_editor {
         log::info!("Launching SeRen in editor mode.");
         let input = game::input::cmd_line(seren::editor::Action::parse_input);
-        let display = game::display::cmd_line();
-        log::trace!("Input and display intialized. Running editor now.");
-        run_app(seren::EditorState::new(cfg), input, display, seren::EditorCfg)
-            .tap_err(|e| log::error!("Editor has crashed due to {:?}.", e))
+        if opts.use_raw_mode {
+            let display = game::display::cmd_line();
+            log::trace!("Input and display intialized. Running editor now.");
+            run_app(seren::EditorState::new(cfg), input, display, seren::EditorCfg)
+                .tap_err(|e| log::error!("Editor has crashed due to {:?}.", e))
+        } else {
+            let display = game::display::raw_cmd_line();
+            log::trace!("Input and display intialized. Running editor now.");
+            run_app(seren::EditorState::new(cfg), input, display, seren::EditorCfg)
+                .tap_err(|e| log::error!("Editor has crashed due to {:?}.", e))
+        }
     } else {
         log::info!("Launching SeRen in game mode.");
         let input = game::input::cmd_line(seren::game::Action::parse_input);
-        let display = game::display::cmd_line();
-        log::trace!("Input and display intialized. Running game now.");
-        run_app(seren::GameState::init(&cfg)?, input, display, cfg)
-            .tap_err(|e| log::error!("Game has crashed due to {:?}.", e))
+        if opts.use_raw_mode {
+            let display = game::display::raw_cmd_line();
+            log::trace!("Input and display intialized. Running game now.");
+            run_app(seren::GameState::init(&cfg)?, input, display, cfg)
+                .tap_err(|e| log::error!("Game has crashed due to {:?}.", e))
+        } else {
+            let display = game::display::cmd_line();
+            log::trace!("Input and display intialized. Running game now.");
+            run_app(seren::GameState::init(&cfg)?, input, display, cfg)
+                .tap_err(|e| log::error!("Game has crashed due to {:?}.", e))
+        }
     };
 
     log::trace!("Shutdown complete. Terminating.");

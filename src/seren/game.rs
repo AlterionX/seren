@@ -186,10 +186,11 @@ impl State {
 
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // TODO determine if the current line should be reprinted after an error occurs.
         if let Some(text) = self.error_text.as_ref() { 
-            write!(f, "{}", text)
-        } else if let Some(line) = self.curr_scene.get_line(self.curr_line) {
+            write!(f, "Error encountered: {}", text)?;
+        }
+        // Display the line, even if there was an error.
+        if let Some(line) = self.curr_scene.get_line(self.curr_line) {
             write!(f, "{}", scene::FilteredStandardLine { line, stats: self.stats.as_ref() })
         } else {
             write!(f, "Oops, an error has occurred.")

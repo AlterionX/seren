@@ -59,3 +59,20 @@ impl<'a, Action> Drop for CmdInput<'a, Action> {
         }
     }
 }
+
+pub struct RawCmdInput<'a, Action> {
+    backup_input: CmdInput<'a, Action>,
+}
+
+impl<'a, Action> Input<Action> for RawCmdInput<'a, Action> {
+    fn next_action(&mut self) -> Result<SystemAction<Action>, Err> {
+        // TODO read the raw terminal inputs.
+        self.backup_input.next_action()
+    }
+}
+
+pub fn raw_cmd_line<'a, Action>(parse: fn(Option<String>) -> Result<SystemAction<Action>, String>) -> RawCmdInput<'a, Action> {
+    RawCmdInput {
+        backup_input: cmd_line(parse),
+    }
+}
