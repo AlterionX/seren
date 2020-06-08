@@ -1,5 +1,3 @@
-use termion::raw::{self, RawTerminal};
-
 #[derive(Debug)]
 pub enum RenderMode {
     Render,
@@ -40,7 +38,7 @@ pub fn cmd_line<State, Cfg>() -> CmdDisplay<State, Cfg> {
 
 pub struct RawCmdDisplay<State, Cfg> {
     backup_display: CmdDisplay<State, Cfg>,
-    raw_term: Option<raw::RawTerminal<std::io::Stdout>>,
+    raw_term: Option<termion::raw::RawTerminal<std::io::Stdout>>,
 }
 
 impl <State: std::fmt::Display, Cfg> Display<State, Cfg> for RawCmdDisplay<State, Cfg> {
@@ -73,6 +71,11 @@ pub fn raw_cmd_line<State, Cfg>() -> RawCmdDisplay<State, Cfg> {
             Ok(term)
         })
         .ok();
+    // Note that the terminal should never be in raw mode at this point,
+    // since either the `RawTerminal` is dropped, causing stdout to recover,
+    // or the `suspend_raw_mode` call succeeds, causing stdout to not be in
+    // raw mode, or the initial `into_raw_mode` call failed, and we never
+    // set stdout to raw mode in the first place.
     RawCmdDisplay {
         backup_display: cmd_line(),
         raw_term,

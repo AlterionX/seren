@@ -66,7 +66,7 @@ pub struct RawCmdInput<'a, Action> {
 
 impl<'a, Action> Input<Action> for RawCmdInput<'a, Action> {
     fn next_action(&mut self) -> Result<SystemAction<Action>, Err> {
-        // TODO read the raw terminal inputs.
+        // TODO read the raw terminal inputs, since this won't work if raw mode is enabled.
         self.backup_input.next_action()
     }
 }

@@ -1,6 +1,6 @@
 scene_list:
+  - main_menu
   - a
   - b
-  - main_menu
 scenes: "./scenes/"
 primary_scene: "main_menu"
