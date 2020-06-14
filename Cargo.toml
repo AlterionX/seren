@@ -20,6 +20,7 @@ version = "0.3"
 default-features = false
 [dependencies.fern]
 version = "0.6"
+features = ["colored"]
 [dependencies.chrono]
 version = "0.4"
 [dependencies.termion]
