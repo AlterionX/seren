@@ -13,7 +13,7 @@ struct Cfg {
 impl Cfg {
     fn setup_logger(self) -> Result<(), InitError> {
         let file_out = Dispatch::new()
-            .format(|out, message, record|
+            .format(|out, message, record| {
                 out.finish(format_args!(
                     "{}[{}][{}] {}",
                     Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
@@ -21,11 +21,9 @@ impl Cfg {
                     record.level(),
                     message,
                 ))
-            )
+            })
             .chain(log_file("output.log")?);
-        let dispatch = Dispatch::new()
-            .level(self.level)
-            .chain(file_out);
+        let dispatch = Dispatch::new().level(self.level).chain(file_out);
         let dispatch = if self.bypass_stdio {
             dispatch
         } else {
@@ -36,14 +34,16 @@ impl Cfg {
                 .warn(Color::Yellow)
                 .error(Color::Red);
             let stdout = Dispatch::new()
-                .format(move |out, message, record| out.finish(format_args!(
-                    "{}[{}][{}] {}",
-                    Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                    record.target(),
-                    colors.color(record.level()),
-                    message,
-                )))
-            .chain(std::io::stdout());
+                .format(move |out, message, record| {
+                    out.finish(format_args!(
+                        "{}[{}][{}] {}",
+                        Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                        record.target(),
+                        colors.color(record.level()),
+                        message,
+                    ))
+                })
+                .chain(std::io::stdout());
             dispatch.chain(stdout)
         };
         dispatch.apply().map_err(Into::into)

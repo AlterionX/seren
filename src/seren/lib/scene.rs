@@ -6,7 +6,7 @@ pub use line::{Choice, FilteredStandardLine, Line, LineEnum, StandardLineEnum};
 mod guard;
 pub use guard::{Permission, StatRequirement};
 mod change;
-pub use change::{StatChange, SceneChange};
+pub use change::{SceneChange, StatChange};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Scene<LE: LineEnum> {
@@ -28,7 +28,8 @@ pub type StandardScene = Scene<StandardLineEnum<stats::Stat>>;
 #[cfg(test)]
 mod tests {
     use super::{
-        stats::Stat, Choice, Line, Permission, StandardLineEnum, StatRequirement, Scene, SceneChange, StatChange, StandardScene,
+        stats::Stat, Choice, Line, Permission, Scene, SceneChange, StandardLineEnum, StandardScene,
+        StatChange, StatRequirement,
     };
     #[test]
     fn run_serialization() {

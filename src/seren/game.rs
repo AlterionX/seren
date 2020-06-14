@@ -64,7 +64,7 @@ impl<'a> StateChange<'a> {
             (Some(mut lhs), Some(rhs)) => {
                 lhs.extend(rhs);
                 Some(lhs)
-            },
+            }
         };
         let scene_change = match (lhs.scene_change, rhs.scene_change) {
             (_, scene_change @ Some(_)) | (scene_change, None) => scene_change,
@@ -117,24 +117,27 @@ impl<'a> BorrowedMutState<'a> {
                 self.reset_no_load(cfg);
             }
 
-            let scene = State::load_scene(cfg, self.curr_scene_name.as_str())
-                .map_err(|e| format!(
+            let scene = State::load_scene(cfg, self.curr_scene_name.as_str()).map_err(|e| {
+                format!(
                     "Failed to load scene {} after processing choice due to error {:?}.",
-                    self.curr_scene_name,
-                    e,
-                ))?;
+                    self.curr_scene_name, e,
+                )
+            })?;
             SceneBoO::from(scene)
         };
 
         log::trace!("Current line set to {}.", self.curr_line);
-        let line = scene.get_line(*self.curr_line).expect("line with index less than line_count to exist.");
+        let line = scene
+            .get_line(*self.curr_line)
+            .expect("line with index less than line_count to exist.");
         let stat_store = self.stats.as_ref().ok_or_else(|| stats::Stats::default());
         let stat_store = match &stat_store {
             Ok(s) => *s,
             Err(s) => s,
         };
 
-        let is_valid = line.guards
+        let is_valid = line
+            .guards
             .as_ref()
             .map(|guards| guards.iter().all(|guard| stat_store.verify(guard)))
             .unwrap_or(true);
@@ -142,10 +145,13 @@ impl<'a> BorrowedMutState<'a> {
         let progression = if !is_valid {
             Some(None)
         } else if let scene::StandardLineEnum::Trigger = line.line {
-            Some(self.apply_changes(cfg, StateChange {
-                stat_changes: line.stat_changes.as_ref().map(|v| v.iter().collect()),
-                scene_change: line.scene_change.as_ref(),
-            })?)
+            Some(self.apply_changes(
+                cfg,
+                StateChange {
+                    stat_changes: line.stat_changes.as_ref().map(|v| v.iter().collect()),
+                    scene_change: line.scene_change.as_ref(),
+                },
+            )?)
         } else {
             None
         };
@@ -202,12 +208,12 @@ impl<'a> BorrowedMutState<'a> {
         }
 
         if needs_scene_load {
-            let scene = State::load_scene(cfg, self.curr_scene_name.as_str())
-                .map_err(|e| format!(
+            let scene = State::load_scene(cfg, self.curr_scene_name.as_str()).map_err(|e| {
+                format!(
                     "Failed to load scene {} after processing choice due to {:?}.",
-                    self.curr_scene_name,
-                    e,
-                ))?;
+                    self.curr_scene_name, e,
+                )
+            })?;
             Ok(Some(scene))
         } else {
             Ok(None)
@@ -262,17 +268,16 @@ impl<'a> game::State for State {
         let (mut borrowed_self, scene) = self.split_scene();
         let line = scene.get_line(*borrowed_self.curr_line);
 
-        let (
-            stat_changes,
-            scene_change,
-            _guards,
-            line,
-        ) = line.map(|line| (
-            line.stat_changes.as_ref().map(|v| v.iter().collect()),
-            line.scene_change.as_ref(),
-            line.guards.as_ref().map(Vec::as_slice),
-            Some(&line.line),
-        )).unwrap_or((None, None, None, None));
+        let (stat_changes, scene_change, _guards, line) = line
+            .map(|line| {
+                (
+                    line.stat_changes.as_ref().map(|v| v.iter().collect()),
+                    line.scene_change.as_ref(),
+                    line.guards.as_ref().map(Vec::as_slice),
+                    Some(&line.line),
+                )
+            })
+            .unwrap_or((None, None, None, None));
 
         let line_changes = StateChange {
             stat_changes,
@@ -300,9 +305,8 @@ impl<'a> game::State for State {
                 unreachable!("Invalid state: current line is a trigger.");
             }
             // Player actions
-            (Action::Progress, Some(scene::StandardLineEnum::Plain { .. })) => {
-                borrowed_self.apply_changes_and_progress_line(cfg, SceneBoO::from(scene), line_changes)?
-            }
+            (Action::Progress, Some(scene::StandardLineEnum::Plain { .. })) => borrowed_self
+                .apply_changes_and_progress_line(cfg, SceneBoO::from(scene), line_changes)?,
             (
                 Action::Progress,
                 Some(scene::StandardLineEnum::Choice {
@@ -352,10 +356,13 @@ impl<'a> game::State for State {
                     borrowed_self.apply_changes_and_progress_line(
                         cfg,
                         SceneBoO::from(scene),
-                        StateChange::merge(line_changes, StateChange {
-                            stat_changes: stat_changes.as_ref().map(|v| v.iter().collect()),
-                            scene_change: scene_change.as_ref(),
-                        }),
+                        StateChange::merge(
+                            line_changes,
+                            StateChange {
+                                stat_changes: stat_changes.as_ref().map(|v| v.iter().collect()),
+                                scene_change: scene_change.as_ref(),
+                            },
+                        ),
                     )?
                 } else {
                     log::warn!("Attempted to skip option.");
@@ -388,10 +395,13 @@ impl<'a> game::State for State {
                 borrowed_self.apply_changes_and_progress_line(
                     cfg,
                     SceneBoO::from(scene),
-                    StateChange::merge(StateChange {
-                        stat_changes: stat_changes.as_ref().map(|v| v.iter().collect()),
-                        scene_change: scene_change.as_ref(),
-                    }, line_changes),
+                    StateChange::merge(
+                        StateChange {
+                            stat_changes: stat_changes.as_ref().map(|v| v.iter().collect()),
+                            scene_change: scene_change.as_ref(),
+                        },
+                        line_changes,
+                    ),
                 )?
             }
         };

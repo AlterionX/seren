@@ -1,5 +1,5 @@
 use crate::seren::lib::stats;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{
     change::{SceneChange, StatChange},
@@ -39,12 +39,13 @@ pub enum StandardLineEnum<Stat> {
     Trigger,
 }
 
-impl<'de, Stat: Serialize + DeserializeOwned + std::fmt::Debug> LineEnum for StandardLineEnum<Stat> {
+impl<'de, Stat: Serialize + DeserializeOwned + std::fmt::Debug> LineEnum
+    for StandardLineEnum<Stat>
+{
     type Stat = Stat;
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Line<LE: LineEnum> {
     // As of now, scene_change originating from the line field overrides the local scene_change field.
     #[serde(flatten)]
@@ -81,7 +82,7 @@ impl<Stat> std::fmt::Display for StandardLineEnum<Stat> {
                 }
                 write!(f, "{}", text)?;
             }
-            StandardLineEnum::Trigger => ()
+            StandardLineEnum::Trigger => (),
         }
         Ok(())
     }
@@ -170,7 +171,7 @@ impl<'a, 'b, Stat, StatStore: stats::StatStore<Stat> + Default> std::fmt::Displa
                     }
                 }
             }
-            line_enum => write!(f, "{}", line_enum)?
+            line_enum => write!(f, "{}", line_enum)?,
         }
         Ok(())
     }
