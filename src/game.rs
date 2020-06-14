@@ -1,7 +1,7 @@
 use std::io;
 
-pub mod input;
 pub mod display;
+pub mod input;
 
 #[derive(Debug)]
 pub enum Error {
@@ -98,5 +98,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub trait State {
     type ActionEnum: std::fmt::Debug;
     type Cfg: std::fmt::Debug;
-    fn resolve(&mut self, cfg: &Self::Cfg, a: Self::ActionEnum) -> std::result::Result<display::RenderMode, Resolution>;
+    fn resolve(
+        &mut self,
+        cfg: &Self::Cfg,
+        a: Self::ActionEnum,
+    ) -> std::result::Result<display::RenderMode, Resolution>;
 }

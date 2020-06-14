@@ -1,7 +1,10 @@
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "SeRen", about = "Command line interface dictates what mode to launch the game in.")]
+#[structopt(
+    name = "SeRen",
+    about = "Command line interface dictates what mode to launch the game in."
+)]
 pub struct CommandLineInterface {
     #[structopt(long = "--use-editor")]
     pub use_editor: bool,

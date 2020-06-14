@@ -1,9 +1,8 @@
-use serde::{Serialize, Deserialize};
-use std::{path::Path, fs::File, io::BufReader};
 use crate::game;
+use serde::{Deserialize, Serialize};
+use std::{fs::File, io::BufReader, path::Path};
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Cfg {
     pub scene_list: Vec<String>,
     pub scenes: std::path::PathBuf,

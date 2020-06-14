@@ -26,7 +26,7 @@ pub trait Input<Action> {
 
 pub struct CmdInput<'a, Action> {
     parse: fn(Option<String>) -> Result<SystemAction<Action>, String>,
-    stdin: * const std::io::Stdin,
+    stdin: *const std::io::Stdin,
     lines: std::io::Lines<std::io::StdinLock<'a>>,
 }
 
@@ -34,13 +34,13 @@ impl<'a, Action> Input<Action> for CmdInput<'a, Action> {
     fn next_action(&mut self) -> Result<SystemAction<Action>, Err> {
         let line = self.lines.next().transpose()?;
         let parse = &self.parse;
-        Ok((
-            parse(line)
-        )?)
+        Ok((parse(line))?)
     }
 }
 
-pub fn cmd_line<'a, Action>(parse: fn(Option<String>) -> Result<SystemAction<Action>, String>) -> CmdInput<'a, Action> {
+pub fn cmd_line<'a, Action>(
+    parse: fn(Option<String>) -> Result<SystemAction<Action>, String>,
+) -> CmdInput<'a, Action> {
     use std::io::BufRead;
     // Self referential struct...?
     let stdin = Box::leak(Box::new(std::io::stdin()));
@@ -48,7 +48,7 @@ pub fn cmd_line<'a, Action>(parse: fn(Option<String>) -> Result<SystemAction<Act
     CmdInput {
         parse: parse,
         stdin: stdin,
-        lines: lines
+        lines: lines,
     }
 }
 
@@ -71,7 +71,9 @@ impl<'a, Action> Input<Action> for RawCmdInput<'a, Action> {
     }
 }
 
-pub fn raw_cmd_line<'a, Action>(parse: fn(Option<String>) -> Result<SystemAction<Action>, String>) -> RawCmdInput<'a, Action> {
+pub fn raw_cmd_line<'a, Action>(
+    parse: fn(Option<String>) -> Result<SystemAction<Action>, String>,
+) -> RawCmdInput<'a, Action> {
     RawCmdInput {
         backup_input: cmd_line(parse),
     }

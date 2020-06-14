@@ -1,9 +1,9 @@
 mod lib;
 
-pub mod game;
 pub mod editor;
+pub mod game;
 pub mod opts;
 
-pub use self::game::{State as GameState, Cfg as GameCfg};
-pub use self::editor::{State as EditorState, Cfg as EditorCfg};
+pub use self::editor::{Cfg as EditorCfg, State as EditorState};
+pub use self::game::{Cfg as GameCfg, State as GameState};
 pub use self::opts::CommandLineInterface;

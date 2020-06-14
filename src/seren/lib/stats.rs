@@ -1,7 +1,6 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Stat {
     Bossiness,
 }
@@ -21,8 +20,7 @@ pub trait StatStore<S> {
     fn apply(&mut self, change: &super::scene::StatChange<S>);
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Stats {
     bossiness: i64,
 }
@@ -30,7 +28,7 @@ pub struct Stats {
 impl Default for Stats {
     fn default() -> Self {
         Self {
-            bossiness: Stat::Bossiness.default_val()
+            bossiness: Stat::Bossiness.default_val(),
         }
     }
 }
@@ -38,34 +36,23 @@ impl Default for Stats {
 impl StatStore<Stat> for Stats {
     fn stat_value(&self, s: Stat) -> i64 {
         match s {
-            Stat::Bossiness => {
-                self.bossiness
-            },
+            Stat::Bossiness => self.bossiness,
         }
     }
     fn verify(&self, req: &super::scene::StatRequirement<Stat>) -> bool {
-        let super::scene::StatRequirement {
-            stat,
-            range,
-            ..
-        } = req;
+        let super::scene::StatRequirement { stat, range, .. } = req;
         match stat {
             Stat::Bossiness => {
                 let val = self.bossiness;
                 use std::ops::RangeBounds;
                 range.contains(&val)
-            },
+            }
         }
     }
     fn apply(&mut self, req: &super::scene::StatChange<Stat>) {
-        let super::scene::StatChange {
-            stat,
-            change,
-        } = req;
+        let super::scene::StatChange { stat, change } = req;
         match stat {
-            Stat::Bossiness => {
-                self.bossiness += change
-            },
+            Stat::Bossiness => self.bossiness += change,
         };
     }
 }

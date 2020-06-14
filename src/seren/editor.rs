@@ -1,7 +1,10 @@
 // This entire file is TODO.
 
-use serde::{Serialize, Deserialize};
-use crate::{seren::lib::cfg, game::{self, input::SystemAction}};
+use crate::{
+    game::{self, input::SystemAction},
+    seren::lib::cfg,
+};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct State {
@@ -10,21 +13,17 @@ pub struct State {
 
 impl State {
     pub fn new(cfg: cfg::Cfg) -> State {
-        State {
-            game_cfg: cfg,
-        }
+        State { game_cfg: cfg }
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Cfg;
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Action {
     Progress,
-    Select(usize)
+    Select(usize),
 }
 
 impl Action {
@@ -32,9 +31,7 @@ impl Action {
         let action = if let Some(cmd) = cmd {
             log::debug!("Entry echo: {:?}", cmd);
             let action = match cmd.as_str() {
-                "" => {
-                    Action::Progress
-                }
+                "" => Action::Progress,
                 _ => {
                     if let Some(n) = cmd.parse::<usize>().ok() {
                         Action::Select(n)
@@ -55,7 +52,11 @@ impl Action {
 impl<'a> game::State for State {
     type ActionEnum = Action;
     type Cfg = Cfg;
-    fn resolve(&mut self, _cfg: &Cfg, _a: Action) -> Result<game::display::RenderMode, game::Resolution> {
+    fn resolve(
+        &mut self,
+        _cfg: &Cfg,
+        _a: Action,
+    ) -> Result<game::display::RenderMode, game::Resolution> {
         // TODO
         Ok(game::display::RenderMode::Render)
     }

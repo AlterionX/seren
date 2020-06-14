@@ -31,7 +31,8 @@ pub fn setup() -> Result<(), fern::InitError> {
     Cfg {
         level: log::LevelFilter::Debug,
         bypass_stdio: false,
-    }.setup_logger()
+    }
+    .setup_logger()
 }
 
 #[cfg(not(debug_assertions))]
@@ -39,5 +40,6 @@ pub fn setup() -> Result<(), fern::InitError> {
     Cfg {
         level: log::LevelFilter::Info,
         bypass_stdio: true,
-    }.setup_logger()
+    }
+    .setup_logger()
 }

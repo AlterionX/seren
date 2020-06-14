@@ -1,8 +1,8 @@
 // Kinda meta
-pub mod scene;
 pub mod cfg;
+pub mod scene;
 
 // Gameplay
-pub mod item;
 pub mod inventory;
+pub mod item;
 pub mod stats;
