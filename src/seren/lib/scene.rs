@@ -52,6 +52,7 @@ impl<Stat> std::fmt::Display for Choice<Stat> {
 pub enum StandardLineEnum<Stat> {
     Choice {
         text: String,
+        default_choice: Option<usize>,
         choices: Vec<Choice<Stat>>,
         speaker: Option<String>,
     },
@@ -66,6 +67,7 @@ impl<Stat> std::fmt::Display for StandardLineEnum<Stat> {
         match self {
             StandardLineEnum::Choice {
                 text,
+                default_choice,
                 choices,
                 speaker
             } => {
@@ -74,7 +76,11 @@ impl<Stat> std::fmt::Display for StandardLineEnum<Stat> {
                 }
                 write!(f, "{}", text)?;
                 for (idx, choice) in choices.iter().enumerate() {
-                    write!(f, "\n\t{}. {}", idx + 1, choice)?;
+                    if default_choice.unwrap_or(choices.len()) == idx {
+                        write!(f, "\n\t{}. {} (default)", idx + 1, choice)?;
+                    } else {
+                        write!(f, "\n\t{}. {}", idx + 1, choice)?;
+                    }
                 }
             },
             StandardLineEnum::Plain { text, speaker } => {
@@ -121,6 +127,42 @@ impl<'a, 'b, Stat, StatStore: stats::StatStore<Stat> + Default> FilteredStandard
             StandardLineEnum::Plain { .. } => vec![],
         }
     }
+
+    pub fn get_default_choice_idx(&self) -> Option<usize> {
+        match self.line {
+            StandardLineEnum::Choice {
+                choices,
+                default_choice,
+                ..
+            } => {
+                let default_choice = if let Some(default_choice) = default_choice {
+                    *default_choice
+                } else {
+                    return None;
+                };
+                let stats = self.stats.ok_or_else(|| StatStore::default());
+                let removed_choices = choices
+                    .as_slice()[0..default_choice]
+                    .iter()
+                    .filter(|c| {
+                        if let Some(guards) = c.guards.as_ref() {
+                            let stats_ref = match &stats {
+                                Err(e) => e,
+                                Ok(a) => *a,
+                            };
+                            guards
+                                .iter()
+                                .all(|req| stats_ref.verify(req))
+                        } else {
+                            true
+                        }
+                    })
+                    .count();
+                Some(default_choice - removed_choices)
+            },
+            StandardLineEnum::Plain { .. } => None,
+        }
+    }
 }
 
 impl<'a, 'b, Stat, StatStore: stats::StatStore<Stat> + Default> std::fmt::Display for FilteredStandardLine<'a, 'b, Stat, StatStore> {
@@ -129,15 +171,20 @@ impl<'a, 'b, Stat, StatStore: stats::StatStore<Stat> + Default> std::fmt::Displa
             StandardLineEnum::Choice {
                 text,
                 speaker,
-                choices: _choices,
+                ..
             } => {
                 if let Some(speaker) = speaker {
                     write!(f, "{}: ", speaker)?;
                 }
                 write!(f, "{}", text)?;
                 let valid_choices = self.get_filtered_choices();
+                let default_choice = self.get_default_choice_idx();
                 for (idx, choice) in valid_choices.into_iter().enumerate() {
-                    write!(f, "\n\t{}. {}", idx + 1, choice)?;
+                    if default_choice.map_or(false, |default_choice| default_choice == idx) {
+                        write!(f, "\n\t{}. {} (default)", idx + 1, choice)?;
+                    } else {
+                        write!(f, "\n\t{}. {}", idx + 1, choice)?;
+                    }
                 }
             },
             StandardLineEnum::Plain {
@@ -183,6 +230,7 @@ mod tests {
                 StandardLineEnum::Choice {
                     speaker: None,
                     text: "this is the text".to_string(),
+                    default_choice: None,
                     choices: vec![
                         Choice {
                             text: "choice 0".to_string(),
