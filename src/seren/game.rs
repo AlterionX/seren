@@ -53,13 +53,6 @@ pub struct State {
     error_text: Option<String>,
 }
 
-struct BorrowedMutState<'a> {
-    curr_scene_name: &'a mut String,
-    curr_line: &'a mut usize,
-    stats: &'a mut Option<stats::Stats>,
-    error_text: &'a mut Option<String>,
-}
-
 struct StateChange<'a> {
     stat_changes: Option<Vec<&'a scene::StatChange<stats::Stat>>>,
     scene_change: Option<&'a scene::SceneChange>,
@@ -85,6 +78,14 @@ impl<'a> StateChange<'a> {
 }
 
 type SceneBoO<'a> = BoO<'a, scene::StandardScene>;
+
+struct BorrowedMutState<'a> {
+    curr_scene_name: &'a mut String,
+    curr_line: &'a mut usize,
+    stats: &'a mut Option<stats::Stats>,
+    error_text: &'a mut Option<String>,
+}
+
 impl<'a> BorrowedMutState<'a> {
     fn progress_line(
         &mut self,
@@ -95,14 +96,13 @@ impl<'a> BorrowedMutState<'a> {
         // TODO progress until we hit a non-trigger line
 
         let line_count = scene.line_count();
-        if bypass_initial_increment {
+        let scene = if bypass_initial_increment {
             log::debug!("Bypassing line increment.");
-            Ok(scene.owned())
+            scene
         } else if line_count != 0 && (*self.curr_line) < line_count - 1 {
             log::debug!("Progressing to next line.");
             (*self.curr_line) += 1;
-            log::trace!("Current line set to {}.", self.curr_line);
-            Ok(scene.owned())
+            scene
         } else {
             log::debug!("Reached end of scene.");
             if let Some(scene) = scene.next_scene.as_ref() {
@@ -126,18 +126,51 @@ impl<'a> BorrowedMutState<'a> {
                     self.curr_scene_name,
                     e,
                 ))?;
-            Ok(Some(scene))
+            SceneBoO::from(scene)
+        };
+
+        log::trace!("Current line set to {}.", self.curr_line);
+        let line = scene.get_line(*self.curr_line).expect("line with index less than line_count to exist.");
+        let stat_store = self.stats.as_ref().ok_or_else(|| stats::Stats::default());
+        let stat_store = match &stat_store {
+            Ok(s) => *s,
+            Err(s) => s,
+        };
+
+        let is_valid = line.guards
+            .as_ref()
+            .map(|guards| guards.iter().all(|guard| stat_store.verify(guard)))
+            .unwrap_or(true);
+
+        let progression = if !is_valid {
+            Some(None)
+        } else if let scene::StandardLineEnum::Trigger = line.line {
+            Some(self.apply_changes(cfg, StateChange {
+                stat_changes: line.stat_changes.as_ref().map(|v| v.iter().collect()),
+                scene_change: line.scene_change.as_ref(),
+            })?)
+        } else {
+            None
+        };
+
+        if let Some(new_scene) = progression {
+            if let Some(scene) = new_scene {
+                self.progress_line(cfg, SceneBoO::from(scene), false)
+            } else {
+                self.progress_line(cfg, scene, false)
+            }
+        } else {
+            Ok(scene.owned())
         }
     }
 
-    fn apply_changes_and_progress_line(
+    fn apply_changes<'b>(
         &mut self,
         cfg: &Cfg,
-        scene: SceneBoO,
         StateChange {
             stat_changes,
             scene_change,
-        }: StateChange<'a>,
+        }: StateChange<'b>,
     ) -> Result<Option<scene::StandardScene>, game::Resolution> {
         let mut needs_scene_load = false;
         if let (Some(stats), Some(changes)) = (self.stats.as_mut(), stat_changes) {
@@ -171,18 +204,31 @@ impl<'a> BorrowedMutState<'a> {
             }
         }
 
-        let scene = if needs_scene_load {
+        if needs_scene_load {
             let scene = State::load_scene(cfg, self.curr_scene_name.as_str())
                 .map_err(|e| format!(
                     "Failed to load scene {} after processing choice due to {:?}.",
                     self.curr_scene_name,
                     e,
                 ))?;
-            SceneBoO::from(scene)
+            Ok(Some(scene))
         } else {
-            SceneBoO::from(scene)
+            Ok(None)
+        }
+    }
+
+    fn apply_changes_and_progress_line<'b>(
+        &mut self,
+        cfg: &Cfg,
+        scene: SceneBoO,
+        changes: StateChange<'b>,
+    ) -> Result<Option<scene::StandardScene>, game::Resolution> {
+        let (scene, new_scene_loaded) = if let Some(scene) = self.apply_changes(cfg, changes)? {
+            (SceneBoO::from(scene), true)
+        } else {
+            (scene, false)
         };
-        self.progress_line(cfg, scene, needs_scene_load)
+        self.progress_line(cfg, scene, new_scene_loaded)
     }
 
     fn reset_no_load(&mut self, cfg: &cfg::Cfg) {
@@ -253,8 +299,8 @@ impl<'a> game::State for State {
                 return Err("OOB Line. Early termination.".to_owned().into());
             }
             (_, Some(scene::StandardLineEnum::Trigger)) => {
-                // TODO figure out how to handle this. Ignore for now.
-                panic!("Invalid state: current line is a trigger.");
+                // TODO figure out how to handle this. Panic for now.
+                unreachable!("Invalid state: current line is a trigger.");
             }
             // Player actions
             (Action::Progress, Some(scene::StandardLineEnum::Plain { .. })) => {

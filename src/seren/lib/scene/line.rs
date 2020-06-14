@@ -16,7 +16,6 @@ pub struct Choice<Stat> {
 
 impl<Stat> std::fmt::Display for Choice<Stat> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // TODO possibly render the rest?
         write!(f, "{}", self.text)
     }
 }

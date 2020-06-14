@@ -36,7 +36,7 @@ impl Action {
                     if let Some(n) = cmd.parse::<usize>().ok() {
                         Action::Select(n)
                     } else {
-                        // TODO eventually consider some sort of input.
+                        // TODO eventually consider some sort of arbitrary text input.
                         Action::Progress
                     }
                 }
@@ -57,7 +57,7 @@ impl<'a> game::State for State {
         _cfg: &Cfg,
         _a: Action,
     ) -> Result<game::display::RenderMode, game::Resolution> {
-        // TODO
+        // TODO This needs to be done at some point...
         Ok(game::display::RenderMode::Render)
     }
 }
