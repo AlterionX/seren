@@ -6,6 +6,7 @@ mod game;
 mod seren;
 
 mod logger;
+mod util;
 
 fn run_app<State: game::State>(
     mut state: State,
