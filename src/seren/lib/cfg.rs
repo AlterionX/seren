@@ -15,7 +15,6 @@ impl Cfg {
     pub fn load_from(p: &Path) -> Result<Cfg, game::InitErr> {
         let f = File::open(p.join("cfg.yaml"))?;
         let buf = BufReader::new(f);
-        // TODO better way to do this?
         let mut cfg: Self = serde_yaml::from_reader(buf)?;
         cfg.root = p.to_owned();
         Ok(cfg)

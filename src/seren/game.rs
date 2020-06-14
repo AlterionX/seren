@@ -8,7 +8,6 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::BufReader};
-use tap::*;
 
 pub use cfg::Cfg;
 
@@ -93,8 +92,6 @@ impl<'a> BorrowedMutState<'a> {
         scene: SceneBoO,
         bypass_initial_increment: bool,
     ) -> Result<Option<scene::StandardScene>, game::Resolution> {
-        // TODO progress until we hit a non-trigger line
-
         let line_count = scene.line_count();
         let scene = if bypass_initial_increment {
             log::debug!("Bypassing line increment.");
@@ -115,7 +112,7 @@ impl<'a> BorrowedMutState<'a> {
                     self.curr_line
                 );
             } else {
-                // TODO the game is over, what now? For now, it just restarts.
+                // The game is over. Let's begin again!
                 log::debug!("Terminal scene completed. Restarting game.");
                 self.reset_no_load(cfg);
             }
@@ -268,7 +265,7 @@ impl<'a> game::State for State {
         let (
             stat_changes,
             scene_change,
-            guards,
+            _guards,
             line,
         ) = line.map(|line| (
             line.stat_changes.as_ref().map(|v| v.iter().collect()),

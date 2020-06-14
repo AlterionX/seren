@@ -7,7 +7,6 @@ pub enum Stat {
 
 impl Stat {
     pub fn default_val(&self) -> i64 {
-        // TODO Consider making this a match statement instead.
         match self {
             Self::Bossiness => 0,
         }
