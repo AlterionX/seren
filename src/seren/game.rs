@@ -61,8 +61,27 @@ struct BorrowedMutState<'a> {
 }
 
 struct StateChange<'a> {
-    stat_changes: Option<&'a [scene::StatChange<stats::Stat>]>,
+    stat_changes: Option<Vec<&'a scene::StatChange<stats::Stat>>>,
     scene_change: Option<&'a scene::SceneChange>,
+}
+
+impl<'a> StateChange<'a> {
+    fn merge<'b: 'a, 'c: 'a>(lhs: StateChange<'b>, rhs: StateChange<'c>) -> Self {
+        let stat_changes = match (lhs.stat_changes, rhs.stat_changes) {
+            (None, stat_changes) | (stat_changes, None) => stat_changes,
+            (Some(mut lhs), Some(rhs)) => {
+                lhs.extend(rhs);
+                Some(lhs)
+            },
+        };
+        let scene_change = match (lhs.scene_change, rhs.scene_change) {
+            (_, scene_change @ Some(_)) | (scene_change, None) => scene_change,
+        };
+        Self {
+            stat_changes,
+            scene_change,
+        }
+    }
 }
 
 type SceneBoO<'a> = BoO<'a, scene::StandardScene>;
@@ -73,6 +92,8 @@ impl<'a> BorrowedMutState<'a> {
         scene: SceneBoO,
         bypass_initial_increment: bool,
     ) -> Result<Option<scene::StandardScene>, game::Resolution> {
+        // TODO progress until we hit a non-trigger line
+
         let line_count = scene.line_count();
         if bypass_initial_increment {
             log::debug!("Bypassing line increment.");
@@ -99,12 +120,12 @@ impl<'a> BorrowedMutState<'a> {
                 self.reset_no_load(cfg);
             }
 
-            let scene = State::load_scene(cfg, self.curr_scene_name.as_str()).map_err(|e| {
-                format!(
-                    "Failed to load scene {} after processing choice.",
-                    self.curr_scene_name
-                )
-            })?;
+            let scene = State::load_scene(cfg, self.curr_scene_name.as_str())
+                .map_err(|e| format!(
+                    "Failed to load scene {} after processing choice due to error {:?}.",
+                    self.curr_scene_name,
+                    e,
+                ))?;
             Ok(Some(scene))
         }
     }
@@ -112,7 +133,7 @@ impl<'a> BorrowedMutState<'a> {
     fn apply_changes_and_progress_line(
         &mut self,
         cfg: &Cfg,
-        scene: &scene::StandardScene,
+        scene: SceneBoO,
         StateChange {
             stat_changes,
             scene_change,
@@ -151,12 +172,12 @@ impl<'a> BorrowedMutState<'a> {
         }
 
         let scene = if needs_scene_load {
-            let scene = State::load_scene(cfg, self.curr_scene_name.as_str()).map_err(|e| {
-                format!(
-                    "Failed to load scene {} after processing choice.",
-                    self.curr_scene_name
-                )
-            })?;
+            let scene = State::load_scene(cfg, self.curr_scene_name.as_str())
+                .map_err(|e| format!(
+                    "Failed to load scene {} after processing choice due to {:?}.",
+                    self.curr_scene_name,
+                    e,
+                ))?;
             SceneBoO::from(scene)
         } else {
             SceneBoO::from(scene)
@@ -198,6 +219,23 @@ impl<'a> game::State for State {
         let (mut borrowed_self, scene) = self.split_scene();
         let line = scene.get_line(*borrowed_self.curr_line);
 
+        let (
+            stat_changes,
+            scene_change,
+            guards,
+            line,
+        ) = line.map(|line| (
+            line.stat_changes.as_ref().map(|v| v.iter().collect()),
+            line.scene_change.as_ref(),
+            line.guards.as_ref().map(Vec::as_slice),
+            Some(&line.line),
+        )).unwrap_or((None, None, None, None));
+
+        let line_changes = StateChange {
+            stat_changes,
+            scene_change,
+        };
+
         let next_scene = match (a, line) {
             // Error handling
             (Action::PromptRetry, _) => {
@@ -214,9 +252,13 @@ impl<'a> game::State for State {
                 );
                 return Err("OOB Line. Early termination.".to_owned().into());
             }
+            (_, Some(scene::StandardLineEnum::Trigger)) => {
+                // TODO figure out how to handle this. Ignore for now.
+                panic!("Invalid state: current line is a trigger.");
+            }
             // Player actions
             (Action::Progress, Some(scene::StandardLineEnum::Plain { .. })) => {
-                borrowed_self.progress_line(cfg, SceneBoO::from(scene), false)?
+                borrowed_self.apply_changes_and_progress_line(cfg, SceneBoO::from(scene), line_changes)?
             }
             (
                 Action::Progress,
@@ -266,11 +308,11 @@ impl<'a> game::State for State {
                     } = default_choice;
                     borrowed_self.apply_changes_and_progress_line(
                         cfg,
-                        scene,
-                        StateChange {
-                            stat_changes: stat_changes.as_ref().map(|v| v.as_slice()),
+                        SceneBoO::from(scene),
+                        StateChange::merge(line_changes, StateChange {
+                            stat_changes: stat_changes.as_ref().map(|v| v.iter().collect()),
                             scene_change: scene_change.as_ref(),
-                        },
+                        }),
                     )?
                 } else {
                     log::warn!("Attempted to skip option.");
@@ -302,11 +344,11 @@ impl<'a> game::State for State {
                 };
                 borrowed_self.apply_changes_and_progress_line(
                     cfg,
-                    scene,
-                    StateChange {
-                        stat_changes: stat_changes.as_ref().map(|v| v.as_slice()),
+                    SceneBoO::from(scene),
+                    StateChange::merge(StateChange {
+                        stat_changes: stat_changes.as_ref().map(|v| v.iter().collect()),
                         scene_change: scene_change.as_ref(),
-                    },
+                    }, line_changes),
                 )?
             }
         };
@@ -321,6 +363,7 @@ impl<'a> game::State for State {
 
 impl State {
     pub fn init(cfg: &cfg::Cfg) -> Result<State, game::LoadErr> {
+        // TODO progress scene if the first line is not valid or is a trigger
         let scene = Self::load_scene(cfg, cfg.primary_scene.as_str())?;
         Ok(State {
             curr_scene: scene,
@@ -351,6 +394,7 @@ impl std::fmt::Display for State {
         }
         // Display the line, even if there was an error.
         if let Some(line) = self.curr_scene.get_line(self.curr_line) {
+            let line = &line.line;
             write!(
                 f,
                 "{}",
