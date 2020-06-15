@@ -1,4 +1,4 @@
-use crate::seren::lib::stats;
+use crate::{seren::lib::stats, util::Boo};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{
@@ -129,21 +129,30 @@ impl<'a, 'b, Stat, StatStore: stats::StatStore<Stat> + Default>
                 } else {
                     return None;
                 };
-                let stats = self.stats.ok_or_else(|| StatStore::default());
+                let stats = Boo::from_some_ref_or_default(self.stats);
+                let default_is_invalid = choices[default_choice]
+                    .guards
+                    .as_ref()
+                    .map(|guards| {
+                        !guards
+                            .iter()
+                            .all(|req| stats.verify(req))
+                    })
+                    .unwrap_or(false);
+                if default_is_invalid {
+                    return None;
+                }
                 let removed_choices = choices.as_slice()[0..default_choice]
                     .iter()
                     .filter(|c| {
                         if let Some(guards) = c.guards.as_ref() {
-                            let stats_ref = match &stats {
-                                Err(e) => e,
-                                Ok(a) => *a,
-                            };
-                            guards.iter().all(|req| stats_ref.verify(req))
+                            guards.iter().all(|req| stats.verify(req))
                         } else {
                             true
                         }
                     })
                     .count();
+                log::info!("Found {} removed choices in front of default choice {}.", removed_choices, default_choice);
                 Some(default_choice - removed_choices)
             }
             StandardLineEnum::Plain { .. } | StandardLineEnum::Trigger => None,

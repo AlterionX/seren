@@ -4,7 +4,7 @@ use crate::{
         cfg, scene,
         stats::{self, StatStore},
     },
-    util::BoO,
+    util::Boo,
 };
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::BufReader};
@@ -76,7 +76,7 @@ impl<'a> StateChange<'a> {
     }
 }
 
-type SceneBoO<'a> = BoO<'a, scene::StandardScene>;
+type SceneBoo<'a> = Boo<'a, scene::StandardScene>;
 
 struct BorrowedMutState<'a> {
     curr_scene_name: &'a mut String,
@@ -89,7 +89,7 @@ impl<'a> BorrowedMutState<'a> {
     fn progress_line(
         &mut self,
         cfg: &Cfg,
-        scene: SceneBoO,
+        scene: SceneBoo,
         bypass_initial_increment: bool,
     ) -> Result<Option<scene::StandardScene>, game::Resolution> {
         let line_count = scene.line_count();
@@ -123,7 +123,7 @@ impl<'a> BorrowedMutState<'a> {
                     self.curr_scene_name, e,
                 )
             })?;
-            SceneBoO::from(scene)
+            SceneBoo::from(scene)
         };
 
         log::trace!("Current line set to {}.", self.curr_line);
@@ -143,7 +143,7 @@ impl<'a> BorrowedMutState<'a> {
             .unwrap_or(true);
 
         let progression = if !is_valid {
-            Some(None)
+            Some((None, false))
         } else if let scene::StandardLineEnum::Trigger = line.line {
             Some(self.apply_changes(
                 cfg,
@@ -156,11 +156,11 @@ impl<'a> BorrowedMutState<'a> {
             None
         };
 
-        if let Some(new_scene) = progression {
+        if let Some((new_scene, just_jumped)) = progression {
             if let Some(scene) = new_scene {
-                self.progress_line(cfg, SceneBoO::from(scene), false)
+                self.progress_line(cfg, SceneBoo::from(scene), just_jumped)
             } else {
-                self.progress_line(cfg, scene, false)
+                self.progress_line(cfg, scene, just_jumped)
             }
         } else {
             Ok(scene.owned())
@@ -174,29 +174,41 @@ impl<'a> BorrowedMutState<'a> {
             stat_changes,
             scene_change,
         }: StateChange<'b>,
-    ) -> Result<Option<scene::StandardScene>, game::Resolution> {
-        let mut needs_scene_load = false;
+    ) -> Result<(Option<scene::StandardScene>, bool), game::Resolution> {
+        if self.stats.is_none() {
+            let _ = self.stats.replace(stats::Stats::default());
+        }
         if let (Some(stats), Some(changes)) = (self.stats.as_mut(), stat_changes) {
             log::info!("Applying stat changes.");
             for change in changes {
                 stats.apply(change);
             }
+            log::info!("Stats are now: {:?}", stats);
         }
 
-        if let Some(change) = scene_change {
+        let (scene, just_jumped) = if let Some(change) = scene_change {
             let scene::SceneChange {
                 target_scene,
                 target_line,
             } = change;
-            if let Some(scene_name) = target_scene {
+            let scene = if let Some(scene_name) = target_scene {
                 (*self.curr_scene_name) = scene_name.clone();
                 log::info!(
                     "Setting target scene to {:?}, at line 0 while processing choice selection.",
                     self.curr_scene_name
                 );
                 (*self.curr_line) = 0;
-                needs_scene_load = true;
-            }
+                Some(
+                    State::load_scene(cfg, self.curr_scene_name.as_str()).map_err(|e| {
+                        format!(
+                            "Failed to load scene {} after processing choice due to {:?}.",
+                            self.curr_scene_name, e,
+                        )
+                    })?,
+                )
+            } else {
+                None
+            };
             if let Some(line) = target_line {
                 log::info!(
                     "Line number changed from {} to {} while processing choice selection.",
@@ -205,39 +217,33 @@ impl<'a> BorrowedMutState<'a> {
                 );
                 (*self.curr_line) = *line;
             }
-        }
-
-        if needs_scene_load {
-            let scene = State::load_scene(cfg, self.curr_scene_name.as_str()).map_err(|e| {
-                format!(
-                    "Failed to load scene {} after processing choice due to {:?}.",
-                    self.curr_scene_name, e,
-                )
-            })?;
-            Ok(Some(scene))
+            (scene, true)
         } else {
-            Ok(None)
-        }
+            (None, false)
+        };
+
+        Ok((scene, just_jumped))
     }
 
     fn apply_changes_and_progress_line<'b>(
         &mut self,
         cfg: &Cfg,
-        scene: SceneBoO,
+        scene: SceneBoo,
         changes: StateChange<'b>,
     ) -> Result<Option<scene::StandardScene>, game::Resolution> {
-        let (scene, new_scene_loaded) = if let Some(scene) = self.apply_changes(cfg, changes)? {
-            (SceneBoO::from(scene), true)
+        let (new_scene, just_jumped) = self.apply_changes(cfg, changes)?;
+        let scene = if let Some(scene) = new_scene {
+            SceneBoo::from(scene)
         } else {
-            (scene, false)
+            scene
         };
-        self.progress_line(cfg, scene, new_scene_loaded)
+        self.progress_line(cfg, scene, just_jumped)
     }
 
     fn reset_no_load(&mut self, cfg: &cfg::Cfg) {
         let _ = (*self.stats).take();
         (*self.curr_scene_name) = cfg.primary_scene.clone();
-        (*self.curr_line) = 0;
+        let _ = (*self.curr_line) = 0;
         let _ = (*self.error_text).take();
     }
 }
@@ -306,7 +312,7 @@ impl<'a> game::State for State {
             }
             // Player actions
             (Action::Progress, Some(scene::StandardLineEnum::Plain { .. })) => borrowed_self
-                .apply_changes_and_progress_line(cfg, SceneBoO::from(scene), line_changes)?,
+                .apply_changes_and_progress_line(cfg, SceneBoo::from(scene), line_changes)?,
             (
                 Action::Progress,
                 Some(scene::StandardLineEnum::Choice {
@@ -355,7 +361,7 @@ impl<'a> game::State for State {
                     } = default_choice;
                     borrowed_self.apply_changes_and_progress_line(
                         cfg,
-                        SceneBoO::from(scene),
+                        SceneBoo::from(scene),
                         StateChange::merge(
                             line_changes,
                             StateChange {
@@ -394,7 +400,7 @@ impl<'a> game::State for State {
                 };
                 borrowed_self.apply_changes_and_progress_line(
                     cfg,
-                    SceneBoO::from(scene),
+                    SceneBoo::from(scene),
                     StateChange::merge(
                         StateChange {
                             stat_changes: stat_changes.as_ref().map(|v| v.iter().collect()),

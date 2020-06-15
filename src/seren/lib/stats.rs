@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+// TODO isolate permissions in `scene` somehow
+use crate::seren::lib::scene::Permission;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Stat {
@@ -39,13 +41,22 @@ impl StatStore<Stat> for Stats {
         }
     }
     fn verify(&self, req: &super::scene::StatRequirement<Stat>) -> bool {
-        let super::scene::StatRequirement { stat, range, .. } = req;
-        match stat {
+        let super::scene::StatRequirement {
+            stat,
+            range,
+            permission,
+        } = req;
+        let in_range = match stat {
             Stat::Bossiness => {
                 let val = self.bossiness;
                 use std::ops::RangeBounds;
                 range.contains(&val)
             }
+        };
+        if permission == &Permission::Allow {
+            in_range
+        } else {
+            !in_range
         }
     }
     fn apply(&mut self, req: &super::scene::StatChange<Stat>) {
