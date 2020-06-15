@@ -6,6 +6,7 @@ use std::{fs::File, io::BufReader, path::Path};
 pub struct Cfg {
     pub scene_list: Vec<String>,
     pub scenes: std::path::PathBuf,
+    pub saves: std::path::PathBuf,
     pub primary_scene: String,
     #[serde(skip)]
     pub root: std::path::PathBuf,

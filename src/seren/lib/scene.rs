@@ -9,9 +9,28 @@ mod change;
 pub use change::{SceneChange, StatChange};
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum BoolOrVec<T> {
+    Bool(bool),
+    Vec(Vec<T>),
+}
+
+impl<T> BoolOrVec<T> {
+    #[cfg(test)]
+    fn false_val() -> Self {
+        Self::Bool(false)
+    }
+    fn true_val() -> Self {
+        Self::Bool(true)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Scene<LE: LineEnum> {
     lines: Vec<Line<LE>>,
     pub next_scene: Option<String>,
+    #[serde(default = "BoolOrVec::true_val")]
+    pub enable_builtins: BoolOrVec<String>,
 }
 
 impl<LE: LineEnum> Scene<LE> {
@@ -35,6 +54,7 @@ mod tests {
     fn run_serialization() {
         let data: StandardScene = Scene {
             next_scene: Some("whatev".to_string()),
+            enable_builtins: super::BoolOrVec::false_val(),
             lines: vec![
                 Line {
                     guards: None,
