@@ -14,10 +14,11 @@ pub trait Sim {
 
     type Store: game::KeyedStore;
 
-    // TODO Return a Renderer State or StateChange instead of RenderMode.
+    type DisplayData;
+
     fn resolve(
         &mut self,
         cfg: &Self::Cfg,
         a: Self::ActionEnum,
-    ) -> std::result::Result<uial::display::RenderMode, ResolutionErr>;
+    ) -> std::result::Result<uial::display::RenderMode<Self::DisplayData>, ResolutionErr>;
 }
