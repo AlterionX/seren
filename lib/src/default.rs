@@ -374,15 +374,46 @@ impl exec::Sim for Sim {
     }
 }
 
-struct FilteredStandardLine<'a> {
+struct FilteredChoices<'a> {
+    choices: &'a game::line::Choices<Store>,
+    store: &'a <Sim as exec::Sim>::Store,
+}
+
+impl<'a> std::fmt::Display for FilteredChoices<'a> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut counter = 1;
+        for (choice_num, choice) in self.choices.choices.iter().enumerate() {
+            if let Some(guard) = choice.guard.as_ref() {
+                if !self.store.check_guard(&guard)  {
+                    continue;
+                }
+            }
+            counter += 1;
+            write!(fmt, "{}) {}", counter, choice.text)?;
+            if choice_num == self.choices.default_choice {
+                write!(fmt, " (default choice)")?;
+            }
+            write!(fmt, "\n")?;
+        }
+        Ok(())
+    }
+}
+
+struct FilteredLine<'a> {
     line: &'a game::line::Line<Store>,
     store: &'a <Sim as exec::Sim>::Store,
 }
 
-impl<'a> std::fmt::Display for FilteredStandardLine<'a> {
+impl<'a> std::fmt::Display for FilteredLine<'a> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(fmt, "Welp")?;
-        unimplemented!("Filtered line display.")
+        if let Some(speaker) = &self.line.speaker {
+            write!(fmt, "{}: ", speaker)?;
+        }
+        write!(fmt, "{}", self.line.text)?;
+        if let Some(choices) = &self.line.choices {
+            write!(fmt, "{}\n", FilteredChoices { choices, store: self.store })?;
+        }
+        Ok(())
     }
 }
 
@@ -404,7 +435,7 @@ impl std::fmt::Display for uial::display::RenderTup<&Sim, &game::Cfg, <Sim as ex
             write!(
                 f,
                 "{}",
-                FilteredStandardLine {
+                FilteredLine {
                     line,
                     store: &sim.store,
                 }
@@ -421,7 +452,7 @@ pub fn run_app<Sim: exec::Sim>(
     mut display: impl uial::display::Display<Sim, Sim::Cfg, Sim::DisplayData>,
     cfg: Sim::Cfg,
     mut sim: Sim,
-    mut init_disp_data: Sim::DisplayData,
+    init_disp_data: Sim::DisplayData,
 ) -> crate::SeRes<()> {
     // Render once to get the ball rolling.
     display.display(&sim, &cfg, init_disp_data)?;
