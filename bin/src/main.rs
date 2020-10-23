@@ -29,7 +29,7 @@ fn main() -> sl::SeRes<()> {
     let res = if opts.use_editor {
         log::info!("Launching SeRen in editor mode.");
         if opts.use_raw_mode {
-            let input = sl::uial::input::cmd_line(editor::Action::parse_input);
+            let input = sl::uial::input::cmd_line();
             let display = sl::uial::display::cmd_line();
             log::trace!("Input and display intialized. Running editor now.");
             sl::default::run_app(
@@ -37,10 +37,11 @@ fn main() -> sl::SeRes<()> {
                 display,
                 editor::Cfg,
                 editor::State::new(cfg),
+                Default::default(),
             )
             .tap_err(|e| log::error!("Editor has crashed due to {:?}.", e))
         } else {
-            let input = sl::uial::input::cmd_line(editor::Action::parse_input);
+            let input = sl::uial::input::cmd_line();
             let display = sl::uial::display::raw_cmd_line();
             log::trace!("Input and display intialized. Running editor now.");
             sl::default::run_app(
@@ -48,22 +49,23 @@ fn main() -> sl::SeRes<()> {
                 display,
                 editor::Cfg,
                 editor::State::new(cfg),
+                Default::default(),
             )
             .tap_err(|e| log::error!("Editor has crashed due to {:?}.", e))
         }
     } else {
         log::info!("Launching SeRen in game mode.");
         if opts.use_raw_mode {
-            let input = sl::uial::input::cmd_line(game::Action::parse_input);
+            let input = sl::uial::input::cmd_line();
             let display = sl::uial::display::raw_cmd_line();
             log::trace!("Input and display intialized. Running game now.");
-            sl::default::run_app(input, display, cfg, game::State::init(&cfg)?)
+            sl::default::run_app(input, display, cfg, game::Sim::init(&cfg)?, Default::default())
                 .tap_err(|e| log::error!("Game has crashed due to {:?}.", e))
         } else {
-            let input = sl::uial::input::cmd_line(game::Action::parse_input);
+            let input = sl::uial::input::cmd_line();
             let display = sl::uial::display::cmd_line();
             log::trace!("Input and display intialized. Running game now.");
-            sl::default::run_app(input, display, cfg, game::State::init(&cfg)?)
+            sl::default::run_app(input, display, cfg, game::Sim::init(&cfg)?, Default::default())
                 .tap_err(|e| log::error!("Game has crashed due to {:?}.", e))
         }
     };
