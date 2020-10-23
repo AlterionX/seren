@@ -1,18 +1,15 @@
 // This entire file is TODO.
 
-use crate::{
-    game::{self, input::SystemAction},
-    seren::lib::cfg,
-};
+use sl::uial::{input::SystemAction, display};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct State {
-    game_cfg: cfg::Cfg,
+    game_cfg: sl::game::Cfg,
 }
 
 impl State {
-    pub fn new(cfg: cfg::Cfg) -> State {
+    pub fn new(cfg: sl::game::Cfg) -> State {
         State { game_cfg: cfg }
     }
 }
@@ -49,14 +46,14 @@ impl Action {
     }
 }
 
-impl<'a> game::State for State {
+impl<'a> sl::exec::State for State {
     type ActionEnum = Action;
     type Cfg = Cfg;
     fn resolve(
         &mut self,
         _cfg: &Cfg,
         _a: Action,
-    ) -> Result<game::display::RenderMode, game::Resolution> {
+    ) -> sl::SeRes<display::RenderMode, sl::exec::ResolutionErr> {
         // TODO This needs to be done at some point...
         Ok(game::display::RenderMode::Render)
     }

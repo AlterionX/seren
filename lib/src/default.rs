@@ -300,3 +300,32 @@ impl exec::Sim for Sim {
         Ok(render_mode)
     }
 }
+
+// in, out, stable state, unstable state
+pub fn run_app<Sim: exec::Sim>(
+    mut input: impl uial::input::Input<Sim::ActionEnum>,
+    mut display: impl uial::display::Display<Sim, Sim::Cfg>,
+    cfg: Sim::Cfg,
+    mut sim: Sim,
+) -> crate::SeRes<()> {
+    // Render once to get the ball rolling.
+    display.display(&sim, &cfg)?;
+    loop {
+        let action = input.next_action()?;
+        log::debug!("Executing action {:?}", action);
+        match action {
+            uial::input::SystemAction::Exit => {
+                log::info!("System exit command received. Shutting down.");
+                break;
+            }
+            uial::input::SystemAction::Action(a) => match sim.resolve(&cfg, a)? {
+                uial::display::RenderMode::Render => {
+                    log::trace!("Render requested.");
+                    display.display(&sim, &cfg)?
+                },
+                uial::display::RenderMode::Ignore => (),
+            },
+        };
+    }
+    Ok(())
+}
