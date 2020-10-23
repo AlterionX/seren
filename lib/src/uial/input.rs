@@ -14,6 +14,10 @@ impl From<String> for Err {
     }
 }
 
+pub trait CustomAction: Sized {
+    fn parse_input(cmd: Option<String>) -> Result<SystemAction<Self>, String>;
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SystemAction<A> {
     Exit,
@@ -25,30 +29,27 @@ pub trait Input<Action> {
 }
 
 pub struct CmdInput<'a, Action> {
-    parse: fn(Option<String>) -> Result<SystemAction<Action>, String>,
     stdin: *const std::io::Stdin,
     lines: std::io::Lines<std::io::StdinLock<'a>>,
+    _phantom: std::marker::PhantomData<Action>,
 }
 
-impl<'a, Action> Input<Action> for CmdInput<'a, Action> {
+impl<'a, Action: CustomAction> Input<Action> for CmdInput<'a, Action> {
     fn next_action(&mut self) -> Result<SystemAction<Action>, Err> {
         let line = self.lines.next().transpose()?;
-        let parse = &self.parse;
-        Ok((parse(line))?)
+        Ok(Action::parse_input(line)?)
     }
 }
 
-pub fn cmd_line<'a, Action>(
-    parse: fn(Option<String>) -> Result<SystemAction<Action>, String>,
-) -> CmdInput<'a, Action> {
+pub fn cmd_line<'a, Action: CustomAction>() -> CmdInput<'a, Action> {
     use std::io::BufRead;
     // Self referential struct...?
     let stdin = Box::leak(Box::new(std::io::stdin()));
     let lines = stdin.lock().lines();
     CmdInput {
-        parse: parse,
-        stdin: stdin,
-        lines: lines,
+        stdin,
+        lines,
+        _phantom: std::marker::PhantomData,
     }
 }
 
@@ -64,17 +65,15 @@ pub struct RawCmdInput<'a, Action> {
     backup_input: CmdInput<'a, Action>,
 }
 
-impl<'a, Action> Input<Action> for RawCmdInput<'a, Action> {
+impl<'a, Action: CustomAction> Input<Action> for RawCmdInput<'a, Action> {
     fn next_action(&mut self) -> Result<SystemAction<Action>, Err> {
         // TODO read the raw terminal inputs, since this won't work if raw mode is enabled.
         self.backup_input.next_action()
     }
 }
 
-pub fn raw_cmd_line<'a, Action>(
-    parse: fn(Option<String>) -> Result<SystemAction<Action>, String>,
-) -> RawCmdInput<'a, Action> {
+pub fn raw_cmd_line<'a, Action: CustomAction>() -> RawCmdInput<'a, Action> {
     RawCmdInput {
-        backup_input: cmd_line(parse),
+        backup_input: cmd_line(),
     }
 }

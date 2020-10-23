@@ -74,8 +74,8 @@ pub enum Action {
     PromptRetry,
 }
 
-impl Action {
-    pub fn parse_input(cmd: Option<String>) -> Result<uial::input::SystemAction<Action>, String> {
+impl uial::input::CustomAction for Action {
+    fn parse_input(cmd: Option<String>) -> Result<uial::input::SystemAction<Action>, String> {
         let action = if let Some(cmd) = cmd {
             log::debug!("Entry echo: {:?}", cmd);
             let action = match cmd.as_str() {
