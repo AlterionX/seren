@@ -162,6 +162,7 @@ pub enum MaybeMainOrOtherScene {
     String(String, Option<usize>),
 }
 
+#[derive(Default)]
 pub struct DisplayData {
     error_text: Option<String>,
 }
@@ -170,7 +171,9 @@ pub struct Sim {
     pub store: Store,
     pub scene: LoadedScene,
     pub curr_line: usize,
-    pub display: uial::display::CmdDisplay<Self, game::Cfg, DisplayData>,
+}
+
+impl Sim {
 }
 
 impl Sim {
@@ -417,9 +420,17 @@ impl<'a> std::fmt::Display for FilteredLine<'a> {
     }
 }
 
-impl std::fmt::Display for uial::display::RenderTup<&Sim, &game::Cfg, <Sim as exec::Sim>::DisplayData> {
+pub struct RenderTup<'a, Sim: exec::Sim>(&'a Sim, &'a Sim::Cfg, Sim::DisplayData);
+
+impl<'a> uial::display::RenderGroup<'a, Sim, game::Cfg, DisplayData> for RenderTup<'a, Sim> {
+    fn create(a: &'a Sim, b: &'a game::Cfg, c: DisplayData) -> Self {
+        Self(a, b, c)
+    }
+}
+
+impl<'a> std::fmt::Display for RenderTup<'a, Sim> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let uial::display::RenderTup(sim, cfg, data) = self;
+        let RenderTup(sim, cfg, data) = self;
         if let Some(text) = data.error_text.as_ref() {
             write!(f, "Error encountered: {}", text)?;
         }
@@ -447,9 +458,9 @@ impl std::fmt::Display for uial::display::RenderTup<&Sim, &game::Cfg, <Sim as ex
 }
 
 // in, out, stable state, unstable state
-pub fn run_app<Sim: exec::Sim>(
+pub fn run_app<Sim: exec::Sim, RenderData>(
     mut input: impl uial::input::Input<Sim::ActionEnum>,
-    mut display: impl uial::display::Display<Sim, Sim::Cfg, Sim::DisplayData>,
+    mut display: impl uial::display::Display<Sim, Sim::Cfg, Sim::DisplayData, RenderData>,
     cfg: Sim::Cfg,
     mut sim: Sim,
     init_disp_data: Sim::DisplayData,

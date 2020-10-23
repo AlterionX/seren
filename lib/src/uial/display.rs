@@ -4,7 +4,9 @@ pub enum RenderMode<T> {
     Ignore,
 }
 
-pub struct RenderTup<A, B, C>(pub A, pub B, pub C);
+pub trait RenderGroup<'a, A, B, C> {
+    fn create(a: &'a A, b: &'a B, c: C) -> Self;
+}
 
 #[derive(Debug)]
 pub enum Err {
@@ -17,38 +19,38 @@ impl From<std::io::Error> for Err {
     }
 }
 
-pub trait Display<State, Cfg, RenderData> {
-    fn display(&mut self, content: &State, cfg: &Cfg, d: RenderData) -> Result<(), Err>;
+pub trait Display<A, B, C, R> {
+    fn display(&mut self, content: &A, cfg: &B, d: C) -> Result<(), Err>;
 }
 
-pub struct CmdDisplay<State, Cfg, RenderData> {
-    phantom: std::marker::PhantomData<(State, Cfg, RenderData)>,
+pub struct CmdDisplay<A, B, C, R> {
+    phantom: std::marker::PhantomData<(A, B, C, R)>,
 }
 
-impl<State, Cfg, RenderData> Display<State, Cfg, RenderData> for CmdDisplay<State, Cfg, RenderData>
-    where for <'a> RenderTup<&'a State, &'a Cfg, RenderData>: std::fmt::Display
+impl<A, B, C, R> Display<A, B, C, R> for CmdDisplay<A, B, C, R>
+    where R: for <'a> RenderGroup<'a, A, B, C> + std::fmt::Display
 {
-    fn display(&mut self, content: &State, cfg: &Cfg, d: RenderData) -> Result<(), Err> {
-        println!("{}", RenderTup(content, cfg, d));
+    fn display(&mut self, a: &A, b: &B, c: C) -> Result<(), Err> {
+        println!("{}", R::create(a, b, c));
         Ok(())
     }
 }
 
-pub fn cmd_line<State, Cfg, RenderData>() -> CmdDisplay<State, Cfg, RenderData> {
+pub fn cmd_line<A, B, C, R>() -> CmdDisplay<A, B, C, R> {
     CmdDisplay {
         phantom: std::marker::PhantomData,
     }
 }
 
-pub struct RawCmdDisplay<State, Cfg, RenderData> {
-    backup_display: CmdDisplay<State, Cfg, RenderData>,
+pub struct RawCmdDisplay<A, B, C, R> {
+    backup_display: CmdDisplay<A, B, C, R>,
     raw_term: Option<termion::raw::RawTerminal<std::io::Stdout>>,
 }
 
-impl<State, Cfg, RenderData> Display<State, Cfg, RenderData> for RawCmdDisplay<State, Cfg, RenderData>
-    where for <'a> RenderTup<&'a State, &'a Cfg, RenderData>: std::fmt::Display
+impl<A, B, C, R> Display<A, B, C, R> for RawCmdDisplay<A, B, C, R>
+    where R: for <'a> RenderGroup<'a, A, B, C> + std::fmt::Display
 {
-    fn display(&mut self, content: &State, cfg: &Cfg, d: RenderData) -> Result<(), Err> {
+    fn display(&mut self, a: &A, b: &B, c: C) -> Result<(), Err> {
         if let Some(raw_term) = self.raw_term.as_mut() {
             use std::io::Write;
             raw_term.activate_raw_mode()?;
@@ -60,15 +62,15 @@ impl<State, Cfg, RenderData> Display<State, Cfg, RenderData> for RawCmdDisplay<S
             )?;
             raw_term.flush()?;
             raw_term.suspend_raw_mode()?;
-            writeln!(raw_term, "{}", RenderTup(content, cfg, d))?;
+            writeln!(raw_term, "{}", R::create(a, b, c))?;
             Ok(())
         } else {
-            self.backup_display.display(content, cfg, d)
+            self.backup_display.display(a, b, c)
         }
     }
 }
 
-pub fn raw_cmd_line<State, Cfg, RenderData>() -> RawCmdDisplay<State, Cfg, RenderData> {
+pub fn raw_cmd_line<A, B, C, R>() -> RawCmdDisplay<A, B, C, R> {
     use termion::raw::IntoRawMode;
     let raw_term = std::io::stdout()
         .into_raw_mode()
