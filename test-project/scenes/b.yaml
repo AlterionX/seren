@@ -1,0 +1,28 @@
+defined: # This name doesn't actually matter
+  upping_bossiness: &bossiness_up # and neither does this one, for that matter.
+  # The previous two names get discarded when loading
+    stat: Bossiness
+    change: 1
+lines:
+  - text: "Waow, unexpected snob. I hate you."
+  - text: "But I'll give you a chance to apologize."
+    default_choice: 2
+    choices:
+      - text: Apologize for calling them a peon.
+        scene_change:
+          target_line: 4
+      - text: This is hidden. For testing default choices interacting with hidden ones.
+        guards:
+          - stat: Bossiness
+            range: [Included: -1, Excluded: 1]
+      - text: Be privileged.
+        stat_changes:
+          - *bossiness_up
+  - text: Why can't you just apologize?
+  - stat_changes:
+      - *bossiness_up
+  - text: I see that you haven't reflected.
+    guards:
+      - stat: Bossiness
+        range: [Included: 4, Included: 4]
+  - text: "Goodbye."
