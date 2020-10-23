@@ -23,8 +23,8 @@ pub enum Action {
     Select(usize),
 }
 
-impl Action {
-    pub fn parse_input(cmd: Option<String>) -> Result<SystemAction<Action>, String> {
+impl sl::uial::input::CustomAction for Action {
+    fn parse_input(cmd: Option<String>) -> Result<SystemAction<Action>, String> {
         let action = if let Some(cmd) = cmd {
             log::debug!("Entry echo: {:?}", cmd);
             let action = match cmd.as_str() {
@@ -46,21 +46,25 @@ impl Action {
     }
 }
 
-impl<'a> sl::exec::State for State {
+impl<'a> sl::exec::Sim for State {
     type ActionEnum = Action;
     type Cfg = Cfg;
+    type Store = sl::default::Store;
+    type DisplayData = sl::default::DisplayData;
     fn resolve(
         &mut self,
         _cfg: &Cfg,
         _a: Action,
-    ) -> sl::SeRes<display::RenderMode, sl::exec::ResolutionErr> {
+    ) -> Result<display::RenderMode<Self::DisplayData>, sl::exec::ResolutionErr> {
         // TODO This needs to be done at some point...
-        Ok(game::display::RenderMode::Render)
+        Ok(sl::uial::display::RenderMode::Render(Default::default()))
     }
 }
 
-impl std::fmt::Display for State {
+pub struct EditorRenTup<'a>(sl::default::RenderTup<'a, State>);
+
+impl<'a> std::fmt::Display for EditorRenTup<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "hello")
+        unimplemented!("Rendering is not implemented for the editor.");
     }
 }
