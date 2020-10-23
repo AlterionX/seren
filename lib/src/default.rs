@@ -68,29 +68,80 @@ impl game::KeyedStore for Store {
 }
 
 #[derive(Debug)]
-pub enum ActionEnum {
+pub enum Action {
     Select(usize),
     Progress,
     PromptRetry,
 }
 
-pub enum LoadedScene {
-    Name(String),
-    Scene(String, game::Scene<Store>),
+impl Action {
+    pub fn parse_input(cmd: Option<String>) -> Result<uial::input::SystemAction<Action>, String> {
+        let action = if let Some(cmd) = cmd {
+            log::debug!("Entry echo: {:?}", cmd);
+            let action = match cmd.as_str() {
+                "" => Action::Progress,
+                _ => {
+                    if let Some(n) = cmd.parse::<usize>().ok() {
+                        if n == 0 {
+                            Action::PromptRetry
+                        } else {
+                            Action::Select(n - 1)
+                        }
+                    } else {
+                        Action::Progress
+                    }
+                }
+            };
+            uial::input::SystemAction::Action(action)
+        } else {
+            uial::input::SystemAction::Exit
+        };
+        Ok(action)
+    }
+}
+
+pub struct LoadedScene {
+    name: String,
+    scene: Option<game::Scene<Store>>,
 }
 
 impl LoadedScene {
-    fn name(&self) -> &str {
-        match self {
-            Self::Name(n) | Self::Scene(n, _) => {
-                n.as_str()
-            }
+    fn new(name: String) -> Self {
+        Self {
+            name,
+            scene: None,
         }
     }
 
-    fn get_or_load(&mut self) -> &game::Scene<Store> {
-        // TODO Implement
-        unimplemented!("Scene loading not yet implemented!")
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    fn load_scene(name: &str, cfg: &game::Cfg) -> Result<game::Scene<Store>, game::LoadErr> {
+        use std::{fs::File, io::BufReader};
+
+        log::debug!("Loading scene {:?}.", name);
+        let p = cfg
+            .root
+            .join(cfg.scenes.as_path())
+            .join(format!("{}.yaml", name));
+        log::debug!("Loading scene from file {}.", p.display());
+        let f = File::open(p)?;
+        let buf = BufReader::new(f);
+        Ok(serde_yaml::from_reader(buf)?)
+    }
+
+    fn get_or_load(&mut self, cfg: &game::Cfg) -> Result<&game::Scene<Store>, exec::ResolutionErr> {
+        match self.scene {
+            Some(ref sc) => Ok(sc),
+            None => {
+                self.scene = Some(
+                    Self::load_scene(self.name(), cfg)
+                        .map_err(|e| format!("Scene load of {} failed with {:?}", self.name(), e))?
+                );
+                self.get_or_load(cfg)
+            }
+        }
     }
 }
 
@@ -108,8 +159,8 @@ pub struct Sim {
 }
 
 impl Sim {
-    fn is_at_choice(&mut self) -> Result<bool, exec::ResolutionErr> {
-        self.scene.get_or_load()
+    fn is_at_choice(&mut self, cfg: &<Self as exec::Sim>::Cfg) -> Result<bool, exec::ResolutionErr> {
+        self.scene.get_or_load(cfg)?
             .is_line_choice(self.curr_line)
             .map_err(|_| {
                 format!(
@@ -137,11 +188,11 @@ impl Sim {
         scene_change
             .as_ref()
             .map(|new_scene| new_scene.to_inner())
-            .map(|(new_scene, line)| (LoadedScene::Name(new_scene), line))
+            .map(|(new_scene, line)| (LoadedScene::new(new_scene), line))
     }
 
-    fn process_choice_selection(&mut self, choice: usize) -> Result<(), exec::ResolutionErr> {
-        let trigger = match self.scene.get_or_load().get_line_and_visible_choice(&self.store, self.curr_line, choice) {
+    fn process_choice_selection(&mut self, cfg: &<Self as exec::Sim>::Cfg, choice: usize) -> Result<(), exec::ResolutionErr> {
+        let trigger = match self.scene.get_or_load(cfg)?.get_line_and_visible_choice(&self.store, self.curr_line, choice) {
             Ok(c) => Ok(c.trigger.as_ref()),
             Err(game::LineOrChoiceAbsenceError::LineDoesNotExist) =>
                 Err(format!(
@@ -179,8 +230,8 @@ impl Sim {
     }
 
     // TODO Combine with previous methods somehow.
-    fn process_default_choice_selection(&mut self) -> Result<(), exec::ResolutionErr> {
-        let trigger = match self.scene.get_or_load().get_line_and_default_choice(&self.store, self.curr_line) {
+    fn process_default_choice_selection(&mut self, cfg: &<Self as exec::Sim>::Cfg) -> Result<(), exec::ResolutionErr> {
+        let trigger = match self.scene.get_or_load(cfg)?.get_line_and_default_choice(&self.store, self.curr_line) {
             Ok(c) => Ok(c.trigger.as_ref()),
             Err(game::LineOrChoiceAbsenceError::LineDoesNotExist) =>
                 Err(format!(
@@ -215,8 +266,8 @@ impl Sim {
         Ok(())
     }
 
-    fn progress_to_next_line_or_scene_break(&mut self) -> Result<usize, MaybeMainOrOtherScene> {
-        let curr_scene = self.scene.get_or_load();
+    fn progress_to_next_line_or_scene_break(&mut self, cfg: &<Self as exec::Sim>::Cfg) -> Result<usize, MaybeMainOrOtherScene> {
+        let curr_scene = self.scene.get_or_load(cfg).map_err(|_| MaybeMainOrOtherScene::None)?;
         for (line, idx) in (&curr_scene.lines[self.curr_line..]).iter().zip(self.curr_line..) {
             match line.try_to_inner(&self.store) {
                 Ok(game::line::LineOrTrigger::Line(_)) => {
@@ -245,12 +296,12 @@ impl Sim {
 
     fn progress(&mut self, cfg: &<Self as exec::Sim>::Cfg) -> Result<(), exec::ResolutionErr> {
         loop {
-            match self.progress_to_next_line_or_scene_break() {
+            match self.progress_to_next_line_or_scene_break(cfg) {
                 Err(MaybeMainOrOtherScene::String(name, line)) => {
-                    self.jump_to_scene(LoadedScene::Name(name), line)
+                    self.jump_to_scene(LoadedScene::new(name), line)
                 }
                 Err(MaybeMainOrOtherScene::MainScene(line)) => {
-                    self.jump_to_scene(LoadedScene::Name(cfg.primary_scene.clone()), line)
+                    self.jump_to_scene(LoadedScene::new(cfg.primary_scene.clone()), line)
                 }
                 Err(MaybeMainOrOtherScene::None) => {
                     return Err(format!(
@@ -270,7 +321,7 @@ impl Sim {
 }
 
 impl exec::Sim for Sim {
-    type ActionEnum = ActionEnum;
+    type ActionEnum = Action;
     type Cfg = game::Cfg;
 
     type Store = Store;
@@ -282,13 +333,13 @@ impl exec::Sim for Sim {
     ) -> std::result::Result<uial::display::RenderMode, exec::ResolutionErr> {
         let render_mode = match a {
             Self::ActionEnum::Select(choice) => {
-                self.process_choice_selection(choice)?;
+                self.process_choice_selection(cfg, choice)?;
                 self.progress(cfg)?;
                 uial::display::RenderMode::Render
             }
             Self::ActionEnum::Progress => {
-                if self.is_at_choice()? {
-                    self.process_default_choice_selection()?;
+                if self.is_at_choice(cfg)? {
+                    self.process_default_choice_selection(cfg)?;
                 }
                 self.progress(cfg)?;
                 uial::display::RenderMode::Render
