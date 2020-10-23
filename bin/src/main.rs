@@ -7,6 +7,7 @@ mod seren;
 
 mod logger;
 mod util;
+mod opts;
 
 fn run_app<State: game::State>(
     mut state: State,
@@ -42,7 +43,7 @@ fn main() -> game::Result<()> {
         .map_err(|_| game::Resolution("Fern logger failed to initialize.".to_string()))?;
 
     log::info!("SeRen loading cmdline options.");
-    let opts = seren::CommandLineInterface::from_args();
+    let opts = opts::CommandLineInterface::from_args();
     log::debug!("SeRen started with cmdline options {:?}.", opts);
 
     log::info!(
